@@ -34,5 +34,7 @@ func NewRouter(
 		links.GET("/export.csv", linkHandler.ExportCSV)
 	}
 
+	registerDocs(engine)
+
 	return engine, nil
 }

@@ -5,31 +5,74 @@
 
 ## Запуск
 
+Из чистого клона достаточно одной команды:
+
 ```bash
-cp .env.example .env          # задайте DB_PASSWORD
-docker compose up --build
+docker compose up --build -d
 ```
 
-Положите CSV-источники в `data/` как `crm.csv` (`id,title,birthday,clinic`) и
-`site.csv` (`id,title,birthday`). Приложение: http://localhost:8080,
-миграции применяет сервис `migrate`. Данные в БД переживают перезапуск (volume `pgdata`).
+Ничего копировать и настраивать не нужно: docker compose подставляет значения
+по умолчанию, а тестовые CSV уже лежат в репозитории.
+
+- Приложение: http://localhost:8080 (порт меняется переменной `APP_PORT`).
+- Миграции применяет сервис `migrate`, БД — `db`; данные переживают перезапуск (volume `pgdata`).
+- Логи: `docker compose logs -f backend`. Остановить: `docker compose down` (без `-v`).
+
+### Источники данных
+
+| Каталог | Назначение | В Git |
+|---|---|---|
+| `testdata/` | синтетические CSV для тестового задания: `crm.csv` (`id,title,birthday,clinic`), `site.csv` (`id,title,birthday`) | да |
+| `data/` | локальные конфиденциальные выгрузки организации; в контейнер не подключаются | нет (исключён) |
+
+`data/` нужна только для локальной работы с реальными данными и исключена из Git
+целиком — никакие её файлы не отслеживаются. Тестовый запуск использует
+`testdata/`, поэтому состояние репозитория не влияет на демонстрацию.
+
+### Свой `.env`
+
+Файл `.env` необязателен: compose работает без него. Скопируйте
+`.env.example` в `.env`, только если хотите переопределить параметры БД или порт.
+`.env` и `.env.*` не отслеживаются Git, кроме шаблона `.env.example`.
 
 Без Docker: поднимите PostgreSQL, примените `backend/migrations` (goose), задайте
 `DB_HOST DB_PORT DB_USER DB_PASSWORD DB_NAME [DB_SSLMODE] CRM_PATH SITE_PATH [PORT]`
 и выполните `go run ./cmd/server` в `backend/`.
 
-## API (`/api/v1`)
+## API
 
 | Метод | Путь | Назначение |
 |---|---|---|
-| GET | `/crm-clients?q=иванов ив` | поиск в CRM по имени (слова в любом порядке, по началу слова, ё=е), до 50 записей |
-| GET | `/site-clients/:id` | клиент сайта по ID (показать редактору до сохранения) |
-| POST | `/links` `{"crm_id","site_id"}` | сохранить связь: 201 / 404 / 409 / 422 |
-| GET | `/links` | все связи |
-| GET | `/links/export.csv` | CSV с колонками `crm_id,site_id` |
-| GET | `/healthz` | проверка живости и БД |
+| GET | `/api/v1/crm-clients?q=иванов ив` | поиск в CRM по имени (слова в любом порядке, по началу слова, ё=е), до 50 записей |
+| GET | `/api/v1/site-clients/:id` | клиент сайта по ID (показать редактору до сохранения) |
+| POST | `/api/v1/links` `{"crm_id","site_id"}` | сохранить связь: 201 / 400 / 404 / 409 / 422 / 499 / 500 / 502 / 504 |
+| GET | `/api/v1/links` | все связи |
+| GET | `/api/v1/links/export.csv` | CSV с колонками `crm_id,site_id` |
+| GET | `/healthz` | проверка живости и БД (вне префикса `/api/v1`) |
 
 Ошибки: `{"code": "...", "message": "..."}`; `code` стабилен и предназначен для фронтенда.
+
+## Документация API
+
+- Swagger UI: http://localhost:8080/docs/ — локальный, без CDN; доступен на `GET` и `HEAD`.
+- Спецификация OpenAPI 3.1: http://localhost:8080/openapi.json и http://localhost:8080/openapi.yaml.
+- Спецификация хранится в репозитории: `backend/openapi/swagger.json` и
+  `backend/openapi/swagger.yaml`. После правки аннотаций в HTTP-обработчиках
+  перегенерируйте её:
+
+```bash
+cd backend && go generate ./openapi
+```
+
+Шаг публикации (`backend/openapi/publish_openapi.go`) записывает артефакты только
+после проверки: оба документа должны быть валидным OpenAPI 3.1, описывать один и
+тот же контракт, а типы содержимого и ссылки на схему ошибки — совпадать с
+поведением обработчиков. Ошибка на любом из этих шагов оставляет файлы в
+репозитории без изменений.
+
+Набор статусов шаг публикации не сверяет: совпадение спецификации с фактическими
+ответами обработчиков проверяет отдельный автоматический тест паритета
+(`backend/internal/adapters/inbound/http/openapi_parity_test.go`).
 
 ## Допущения
 

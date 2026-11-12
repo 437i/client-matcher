@@ -20,6 +20,23 @@ func NewLinkHandler(svc *services.ClientLinkService) *LinkHandler {
 }
 
 // CreateLink сохраняет связь: POST /api/v1/links {"crm_id": "...", "site_id": "..."}
+//
+//	@Summary		Создать связь CRM и сайта
+//	@Description	Создаёт связь между клиентом CRM и клиентом сайта после проверки совпадения фамилии и даты рождения.
+//	@Tags			links
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		handlers.CreateRequest	true	"Пара идентификаторов"
+//	@Success		201	{object}	handlers.LinkResponse
+//	@Failure		400	{object}	handlers.ErrorResponse
+//	@Failure		404	{object}	handlers.ErrorResponse
+//	@Failure		409	{object}	handlers.ErrorResponse
+//	@Failure		422	{object}	handlers.ErrorResponse
+//	@Failure		499	{object}	handlers.ErrorResponse	"Запрос отменён клиентом (нестандартный код 499)"
+//	@Failure		500	{object}	handlers.ErrorResponse
+//	@Failure		502	{object}	handlers.ErrorResponse	"Источник вернул некорректные данные клиента"
+//	@Failure		504	{object}	handlers.ErrorResponse	"Превышено время ожидания"
+//	@Router			/api/v1/links [post]
 func (h *LinkHandler) CreateLink(c *gin.Context) {
 	var req CreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -37,6 +54,16 @@ func (h *LinkHandler) CreateLink(c *gin.Context) {
 }
 
 // GetList возвращает все сохранённые связи: GET /api/v1/links
+//
+//	@Summary		Список связей
+//	@Description	Возвращает все сохранённые связи между клиентами CRM и сайта.
+//	@Tags			links
+//	@Produce		json
+//	@Success		200	{array}	handlers.LinkResponse
+//	@Failure		499	{object}	handlers.ErrorResponse	"Запрос отменён клиентом (нестандартный код 499)"
+//	@Failure		500	{object}	handlers.ErrorResponse
+//	@Failure		504	{object}	handlers.ErrorResponse	"Превышено время ожидания"
+//	@Router			/api/v1/links [get]
 func (h *LinkHandler) GetList(c *gin.Context) {
 	result, err := h.linkService.GetList(c.Request.Context())
 	if err != nil {
@@ -49,6 +76,20 @@ func (h *LinkHandler) GetList(c *gin.Context) {
 
 // ExportCSV выгружает все связи в CSV с колонками crm_id, site_id:
 // GET /api/v1/links/export.csv
+//
+// Порядок аннотаций важен: swag применяет @Produce только к ответам,
+// объявленным после него. Поэтому @Produce стоит после @Failure — ошибки
+// получают application/json, а успешный ответ — text/csv.
+//
+//	@Summary		Выгрузка связей в CSV
+//	@Description	Отдаёт файл CSV с колонками crm_id, site_id.
+//	@Tags			links
+//	@Failure		499	{object}	handlers.ErrorResponse	"Запрос отменён клиентом (нестандартный код 499)"
+//	@Failure		500	{object}	handlers.ErrorResponse	"Внутренняя ошибка"
+//	@Failure		504	{object}	handlers.ErrorResponse	"Превышено время ожидания"
+//	@Produce		text/csv
+//	@Success		200	{string}	string	"crm_id,site_id"
+//	@Router			/api/v1/links/export.csv [get]
 func (h *LinkHandler) ExportCSV(c *gin.Context) {
 	links, err := h.linkService.GetList(c.Request.Context())
 	if err != nil {

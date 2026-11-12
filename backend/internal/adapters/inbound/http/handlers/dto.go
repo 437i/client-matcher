@@ -39,10 +39,10 @@ type SiteClientResponse struct {
 }
 
 type LinkResponse struct {
-	ID        uuid.UUID `json:"id"`
+	ID        uuid.UUID `json:"id"` // UUID связи
 	CRMID     string    `json:"crm_id"`
 	SiteID    string    `json:"site_id"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"created_at"` // RFC 3339, например 2026-11-11T21:00:00Z
 }
 
 func newCRMClientResponse(c client.CRMClient) CRMClientResponse {

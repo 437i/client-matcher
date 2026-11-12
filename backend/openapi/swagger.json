@@ -1,0 +1,547 @@
+{
+    "components": {
+        "schemas": {
+            "handlers.CRMClientResponse": {
+                "properties": {
+                    "birthday": {
+                        "description": "YYYY-MM-DD",
+                        "type": "string"
+                    },
+                    "clinic": {
+                        "type": "string"
+                    },
+                    "first_name": {
+                        "type": "string"
+                    },
+                    "full_name": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "last_name": {
+                        "type": "string"
+                    },
+                    "patronymic": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.CreateRequest": {
+                "properties": {
+                    "crm_id": {
+                        "type": "string"
+                    },
+                    "site_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "crm_id",
+                    "site_id"
+                ],
+                "type": "object"
+            },
+            "handlers.ErrorResponse": {
+                "properties": {
+                    "code": {
+                        "example": "crm_client_not_found",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "Клиент не найден в CRM",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.LinkResponse": {
+                "properties": {
+                    "created_at": {
+                        "description": "RFC 3339, например 2026-11-11T21:00:00Z",
+                        "type": "string"
+                    },
+                    "crm_id": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "description": "UUID связи",
+                        "type": "string"
+                    },
+                    "site_id": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.SiteClientResponse": {
+                "properties": {
+                    "birthday": {
+                        "description": "YYYY-MM-DD",
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "last_name": {
+                        "type": "string"
+                    },
+                    "short_name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "info": {
+        "description": "REST API для ручного сопоставления ID клиента в CRM и ID клиента на сайте.",
+        "title": "Client Matcher API",
+        "version": "1.0.0"
+    },
+    "externalDocs": {
+        "description": "Исходный код и инструкции по запуску проекта.",
+        "url": "https://github.com/437i/client-matcher"
+    },
+    "paths": {
+        "/api/v1/crm-clients": {
+            "get": {
+                "description": "Ищет клиентов CRM по имени. Возвращает не более 50 записей.",
+                "parameters": [
+                    {
+                        "description": "Фрагмент имени или фамилии",
+                        "example": "иванов",
+                        "in": "query",
+                        "name": "q",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.CRMClientResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "499": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Запрос отменён клиентом (нестандартный код 499)"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "504": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Превышено время ожидания"
+                    }
+                },
+                "summary": "Поиск клиентов в CRM",
+                "tags": [
+                    "crm"
+                ]
+            }
+        },
+        "/api/v1/links": {
+            "get": {
+                "description": "Возвращает все сохранённые связи между клиентами CRM и сайта.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/handlers.LinkResponse"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "499": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Запрос отменён клиентом (нестандартный код 499)"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "504": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Превышено время ожидания"
+                    }
+                },
+                "summary": "Список связей",
+                "tags": [
+                    "links"
+                ]
+            },
+            "post": {
+                "description": "Создаёт связь между клиентом CRM и клиентом сайта после проверки совпадения фамилии и даты рождения.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.CreateRequest",
+                                "summary": "request",
+                                "description": "Пара идентификаторов"
+                            }
+                        }
+                    },
+                    "description": "Пара идентификаторов",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.LinkResponse"
+                                }
+                            }
+                        },
+                        "description": "Created"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Unprocessable Entity"
+                    },
+                    "499": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Запрос отменён клиентом (нестандартный код 499)"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Источник вернул некорректные данные клиента"
+                    },
+                    "504": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Превышено время ожидания"
+                    }
+                },
+                "summary": "Создать связь CRM и сайта",
+                "tags": [
+                    "links"
+                ]
+            }
+        },
+        "/api/v1/links/export.csv": {
+            "get": {
+                "description": "Отдаёт файл CSV с колонками crm_id, site_id.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "crm_id,site_id"
+                    },
+                    "499": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Запрос отменён клиентом (нестандартный код 499)"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Внутренняя ошибка"
+                    },
+                    "504": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Превышено время ожидания"
+                    }
+                },
+                "summary": "Выгрузка связей в CSV",
+                "tags": [
+                    "links"
+                ]
+            }
+        },
+        "/api/v1/site-clients/{id}": {
+            "get": {
+                "description": "Возвращает клиента сайта по его ID, чтобы сверить данные перед сохранением связи.",
+                "parameters": [
+                    {
+                        "description": "ID клиента на сайте",
+                        "example": "3586",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.SiteClientResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "499": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Запрос отменён клиентом (нестандартный код 499)"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "504": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Превышено время ожидания"
+                    }
+                },
+                "summary": "Клиент сайта по ID",
+                "tags": [
+                    "site"
+                ]
+            }
+        },
+        "/healthz": {
+            "get": {
+                "description": "Возвращает статус backend и доступности базы данных.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Service Unavailable"
+                    }
+                },
+                "summary": "Проверка готовности сервиса",
+                "tags": [
+                    "system"
+                ]
+            }
+        }
+    },
+    "openapi": "3.1.0",
+    "tags": [
+        {
+            "description": "Поиск клиентов в CRM.",
+            "name": "crm"
+        },
+        {
+            "description": "Клиенты сайта.",
+            "name": "site"
+        },
+        {
+            "description": "Связи между клиентом CRM и клиентом сайта.",
+            "name": "links"
+        },
+        {
+            "description": "Служебные endpoints.",
+            "name": "system"
+        }
+    ],
+    "servers": [
+        {
+            "description": "Текущий хост, на котором запущен backend.",
+            "url": "/"
+        }
+    ]
+}

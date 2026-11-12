@@ -2,15 +2,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-client_matcher}
+      POSTGRES_USER: ${DB_USER:-client_matcher}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-client_matcher}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432" # для локального `go run`; в проде порт наружу не открывают
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-client_matcher} -d ${DB_NAME:-client_matcher}"]
       interval: 3s
       timeout: 3s
       retries: 10
@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     environment:
       GOOSE_DRIVER: postgres
-      GOOSE_DBSTRING: host=db port=5432 user=${DB_USER} password=${DB_PASSWORD} dbname=${DB_NAME} sslmode=disable
+      GOOSE_DBSTRING: host=db port=5432 user=${DB_USER:-client_matcher} password=${DB_PASSWORD:-client_matcher} dbname=${DB_NAME:-client_matcher} sslmode=disable
     volumes:
       - ./backend/migrations:/migrations:ro
 
@@ -37,16 +37,16 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "5432"
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER:-client_matcher}
+      DB_PASSWORD: ${DB_PASSWORD:-client_matcher}
+      DB_NAME: ${DB_NAME:-client_matcher}
       DB_SSLMODE: disable
       PORT: "8080"
       CRM_PATH: /data/crm.csv
       SITE_PATH: /data/site.csv
       GIN_MODE: release
     volumes:
-      - ./data:/data:ro
+      - ./testdata:/data:ro # синтетические фикстуры из репозитория; локальные выгрузки — в data/
     ports:
       - "${APP_PORT:-8080}:8080"
     healthcheck:

@@ -44,6 +44,7 @@ type memLinkRepo struct {
 	mu        sync.Mutex
 	links     []link.ClientLink
 	createErr error
+	listErr   error
 }
 
 var _ ports.ClientLinkRepo = (*memLinkRepo)(nil)
@@ -63,6 +64,9 @@ func (m *memLinkRepo) Create(_ context.Context, data link.ClientLink) (link.Clie
 func (m *memLinkRepo) List(context.Context) ([]link.ClientLink, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
 	return append([]link.ClientLink{}, m.links...), nil
 }
 
@@ -77,7 +81,7 @@ func (m *memLinkRepo) GetBySiteID(context.Context, string) (link.ClientLink, err
 }
 func (m *memLinkRepo) Delete(context.Context, uuid.UUID) error { return link.ErrNotFound }
 
-func newTestServer(t *testing.T, linkRepo *memLinkRepo) http.Handler {
+func newTestServer(t *testing.T, linkRepo *memLinkRepo) *gin.Engine {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
@@ -256,6 +260,24 @@ func TestExportEmpty(t *testing.T) {
 	rec := do(t, newTestServer(t, &memLinkRepo{}), http.MethodGet, "/api/v1/links/export.csv", "")
 	if rec.Code != http.StatusOK || rec.Body.String() != "crm_id,site_id\n" {
 		t.Errorf("got %d %q", rec.Code, rec.Body)
+	}
+}
+
+func TestExportErrorIsJSON(t *testing.T) {
+	repo := &memLinkRepo{listErr: errors.New("pq: password=secret")}
+	rec := do(t, newTestServer(t, repo), http.MethodGet, "/api/v1/links/export.csv", "")
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status %d, want 500", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+	if code := errCode(t, rec); code != "internal_error" {
+		t.Errorf("code = %q, want internal_error", code)
+	}
+	if strings.Contains(rec.Body.String(), "secret") {
+		t.Error("internal error details leaked to the client")
 	}
 }
 
