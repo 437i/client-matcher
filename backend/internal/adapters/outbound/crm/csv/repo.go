@@ -19,8 +19,8 @@ var crmHeader = []string{"id", "title", "birthday", "clinic"}
 
 type record struct {
 	client client.CRMClient
-	tokens []string // нормализованные слова ФИО для поиска
-	key    string   // ключ сортировки
+	tokens []client.SearchToken // поисковые формы слов ФИО
+	key    string               // стабильный ключ сортировки при равной релевантности
 }
 
 // CSVCRMRepo — реализация ports.CRMReader поверх CSV-файла. После создания
@@ -43,7 +43,7 @@ func NewCSVCRMRepo(path string) (*CSVCRMRepo, error) {
 	for _, row := range rows {
 		cl, err := parseRow(row.Fields)
 		if err != nil {
-			slog.Warn("crm csv: skip row", "file", path, "line", row.Line, "error", err)
+			slog.Warn("crm csv: skip invalid row", "file", path, "line", row.Line)
 			continue
 		}
 		// Дубликат ID — неоднозначность, а не «плохая строка»: падаем сразу.
@@ -52,11 +52,11 @@ func NewCSVCRMRepo(path string) (*CSVCRMRepo, error) {
 		}
 		repo.byID[cl.ID] = cl
 
-		tokens := strings.Fields(client.NormalizeName(cl.FullName()))
+		tokens := client.TokenizeCRMName(cl)
 		repo.records = append(repo.records, record{
 			client: cl,
 			tokens: tokens,
-			key:    strings.Join(tokens, " ") + "\x00" + cl.ID,
+			key:    client.NormalizeName(cl.FullName()) + "\x00" + cl.ID,
 		})
 	}
 
@@ -92,56 +92,58 @@ func parseRow(f []string) (client.CRMClient, error) {
 func parseTitle(title string) (lastName, firstName, patronymic string, err error) {
 	parts := strings.Fields(title)
 	if len(parts) < 2 {
-		return "", "", "", fmt.Errorf("unexpected crm title %q: want \"Фамилия Имя [Отчество]\"", title)
+		return "", "", "", fmt.Errorf("unexpected crm title: want \"Фамилия Имя [Отчество]\"")
 	}
 	return parts[0], parts[1], strings.Join(parts[2:], " "), nil
 }
 
-// Search: каждое слово запроса должно быть началом отдельного слова ФИО
-// (фамилии, имени, отчества) — порядок слов и регистр не важны, ё = е.
+// Search ищет по любым словам ФИО, независимо от их порядка. Сначала идут
+// точные совпадения, затем варианты имён, префиксы, подстроки и единичные
+// опечатки. Результаты остаются кандидатами: этот поиск не подтверждает личность.
 func (r *CSVCRMRepo) Search(ctx context.Context, query string, limit int) ([]client.CRMClient, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	result := []client.CRMClient{}
-	queryTokens := strings.Fields(client.NormalizeName(query))
+	result := make([]client.CRMClient, 0)
+	queryTokens := client.TokenizeSearchQuery(query)
 	if len(queryTokens) == 0 || limit <= 0 {
 		return result, nil
 	}
-	// Длинные слова запроса сопоставляем первыми: они специфичнее коротких.
-	slices.SortStableFunc(queryTokens, func(a, b string) int { return len(b) - len(a) })
 
+	type rankedRecord struct {
+		record record
+		score  int
+	}
+	ranked := make([]rankedRecord, 0)
 	for _, rec := range r.records {
-		if matchTokens(queryTokens, rec.tokens) {
-			result = append(result, rec.client)
-			if len(result) == limit {
-				break
-			}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
+		score := client.MatchNameTokens(queryTokens, rec.tokens)
+		if score > 0 {
+			ranked = append(ranked, rankedRecord{record: rec, score: score})
+		}
+	}
+
+	slices.SortFunc(ranked, func(a, b rankedRecord) int {
+		if a.score > b.score {
+			return -1
+		}
+		if a.score < b.score {
+			return 1
+		}
+		return strings.Compare(a.record.key, b.record.key)
+	})
+
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+	for _, item := range ranked {
+		result = append(result, item.record.client)
 	}
 
 	return result, nil
-}
-
-// matchTokens: каждому слову запроса должно найтись своё слово ФИО, начинающееся
-// с него. «Свои» — чтобы запрос «Иван Иванов» не находил «Иванова Мария»,
-// где оба слова запроса совпали бы с одним и тем же словом.
-func matchTokens(query, tokens []string) bool {
-	used := make([]bool, len(tokens))
-	for _, q := range query {
-		found := false
-		for i, t := range tokens {
-			if !used[i] && strings.HasPrefix(t, q) {
-				used[i], found = true, true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
 }
 
 func (r *CSVCRMRepo) GetByID(ctx context.Context, id string) (client.CRMClient, error) {

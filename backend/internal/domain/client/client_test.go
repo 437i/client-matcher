@@ -8,6 +8,7 @@ func TestNormalizeName(t *testing.T) {
 		{"spaces", "  Бек   кызы ", "бек кызы"},
 		{"yo", "Королёв", "королев"},
 		{"capital yo", "ЁЛКИН", "елкин"},
+		{"unicode composed and decomposed", "Е\u0308лкин", "елкин"},
 		{"empty", "", ""},
 	}
 	for _, tc := range tests {

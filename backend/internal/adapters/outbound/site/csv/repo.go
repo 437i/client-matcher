@@ -32,7 +32,7 @@ func NewCSVSiteRepo(path string) (*CSVSiteRepo, error) {
 	for _, row := range rows {
 		cl, err := parseRow(row.Fields)
 		if err != nil {
-			slog.Warn("site csv: skip row", "file", path, "line", row.Line, "error", err)
+			slog.Warn("site csv: skip invalid row", "file", path, "line", row.Line)
 			continue
 		}
 		if _, dup := repo.byID[cl.ID]; dup {
@@ -69,7 +69,7 @@ func parseRow(f []string) (client.SiteClient, error) {
 func parseTitle(title string) (shortName, lastName string, err error) {
 	parts := strings.Fields(title)
 	if len(parts) < 2 {
-		return "", "", fmt.Errorf("unexpected site title %q: want \"Имя Фамилия\"", title)
+		return "", "", fmt.Errorf("unexpected site title: want \"Имя Фамилия\"")
 	}
 	return parts[0], strings.Join(parts[1:], " "), nil
 }

@@ -19,10 +19,10 @@ func NewClientHandler(svc *services.ClientSearchService) *ClientHandler {
 // Search ищет клиентов CRM по имени: GET /api/v1/crm-clients?q=иванов ив
 //
 //	@Summary		Поиск клиентов в CRM
-//	@Description	Ищет клиентов CRM по имени. Возвращает не более 50 записей.
+//	@Description	Ищет по любой части ФИО, порядок слов не важен. Поддерживает нормализацию, варианты имён, частичные совпадения и ограниченный поиск опечаток. Возвращает не более 50 кандидатов; результат не подтверждает личность.
 //	@Tags			crm
 //	@Produce		json
-//	@Param			q	query		string	true	"Фрагмент имени или фамилии"	example(иванов)
+//	@Param			q	query		string	true	"Любая часть ФИО; порядок слов не важен"	example(артем семенов)
 //	@Success		200	{array}		handlers.CRMClientResponse
 //	@Failure		400	{object}	handlers.ErrorResponse
 //	@Failure		499	{object}	handlers.ErrorResponse	"Запрос отменён клиентом (нестандартный код 499)"

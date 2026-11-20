@@ -1,6 +1,7 @@
 package http_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -163,6 +164,26 @@ func TestSearch(t *testing.T) {
 	}
 	if rec = do(t, srv, http.MethodGet, "/api/v1/crm-clients?q=%20%20", ""); rec.Code != http.StatusBadRequest || errCode(t, rec) != "query_empty" {
 		t.Errorf("blank q: got %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestAccessLogDoesNotContainSearchQuery(t *testing.T) {
+	previousWriter := gin.DefaultWriter
+	var logs bytes.Buffer
+	gin.DefaultWriter = &logs
+	t.Cleanup(func() { gin.DefaultWriter = previousWriter })
+
+	srv := newTestServer(t, &memLinkRepo{})
+	marker := "ПерсональныеФИОДляПроверки"
+	rec := do(t, srv, http.MethodGet, "/api/v1/crm-clients?q="+marker, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	if strings.Contains(logs.String(), marker) {
+		t.Fatalf("access log contains the search query: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), "/api/v1/crm-clients") {
+		t.Fatalf("access log does not contain the route: %s", logs.String())
 	}
 }
 

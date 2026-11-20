@@ -13,7 +13,12 @@ func NewRouter(
 	linkHandler *handlers.LinkHandler,
 	healthHandler *handlers.HealthHandler,
 ) (*gin.Engine, error) {
-	engine := gin.Default()
+	engine := gin.New()
+	// Поисковая строка содержит ФИО. Не записываем query string в access-логи.
+	engine.Use(
+		gin.LoggerWithConfig(gin.LoggerConfig{SkipQueryString: true}),
+		gin.Recovery(),
+	)
 
 	// Не доверяем X-Forwarded-For от кого попало. За reverse proxy укажите его адрес.
 	if err := engine.SetTrustedProxies(nil); err != nil {

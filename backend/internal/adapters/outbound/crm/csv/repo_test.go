@@ -110,6 +110,65 @@ func TestSearch(t *testing.T) {
 	}
 }
 
+func TestSearchWithRealisticNameAnomalies(t *testing.T) {
+	content := `id,title,birthday,clinic
+1,Семенов Артем Ильич,2015-01-23,A
+2,Захарова Дарья Николаевна,2021-05-16,A
+3,Джабраилов Магомед-Амин Юсупович,2017-03-05,A
+4,Coколов Даниил Игоревич,2016-06-30,A
+8,Волков Александр Тимурович,2020-12-15,A
+5,Белова Полина Сергеевна,2019-07-11,A
+6,Белова Полина Сергеевна,2019-07-11,B
+7,Иванов Иван,2015-01-01,A
+`
+	repo := newRepo(t, content)
+
+	tests := []struct {
+		name  string
+		query string
+		want  []string
+	}{
+		{"first name", "артем", []string{"1"}},
+		{"patronymic", "ильич", []string{"1"}},
+		{"words in any order", "ильич семен", []string{"1"}},
+		{"diminutive", "даша", []string{"2"}},
+		{"given name alias from site form", "саша волков", []string{"8"}},
+		{"hyphenated first name", "амин магомед", []string{"3"}},
+		{"mixed Latin and Cyrillic letters", "соколов", []string{"4"}},
+		{"single typo", "соколоФ", []string{"4"}},
+		{"substring inside word", "ванов", []string{"7"}},
+		{"duplicate source records are both returned", "полина белова", []string{"5", "6"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := repo.Search(context.Background(), tc.query, 50)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(ids(got), tc.want) {
+				t.Errorf("Search(%q) = %v, want %v", tc.query, ids(got), tc.want)
+			}
+		})
+	}
+}
+
+func TestSearchRanksExactMatchesBeforeBroaderMatches(t *testing.T) {
+	repo := newRepo(t, `id,title,birthday,clinic
+1,Иванова Мария,1990-01-02,A
+2,Иванов Иван,1982-04-15,A
+`)
+
+	got, err := repo.Search(context.Background(), "иванов", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"2", "1"}
+	if !slices.Equal(ids(got), want) {
+		t.Errorf("ranked IDs = %v, want %v", ids(got), want)
+	}
+}
+
 func TestSearchResultIsIndependentCopy(t *testing.T) {
 	repo := newRepo(t, crmData)
 	first, _ := repo.Search(context.Background(), "Иванов", 10)

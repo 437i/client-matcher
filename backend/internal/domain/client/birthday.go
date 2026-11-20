@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,11 +13,13 @@ type Date struct {
 	Year  int
 }
 
+var ErrInvalidDate = errors.New("invalid calendar date")
+
 // ParseDate разбирает дату в формате YYYY-MM-DD.
 func ParseDate(value string) (Date, error) {
 	parsed, err := time.Parse(time.DateOnly, strings.TrimSpace(value))
 	if err != nil {
-		return Date{}, fmt.Errorf("parse date %q: %w", value, err)
+		return Date{}, ErrInvalidDate
 	}
 	return Date{
 		Day:   parsed.Day(),
