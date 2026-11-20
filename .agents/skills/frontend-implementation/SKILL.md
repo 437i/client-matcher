@@ -18,6 +18,47 @@ Use this skill for any frontend implementation, UI change, API integration, test
 
 Синтетические CSV проекта допустимы. Соблюдай rules/data-safety.md; не читай .env, credentials и секреты без необходимости.
 
+## Modern Web Guidance
+
+The project uses the official `modern-web-guidance` skill installed at
+`.agents/skills/modern-web-guidance/SKILL.md`.
+
+Follow this skill when implementing or changing frontend HTML, CSS,
+client-side JavaScript or UI behavior, especially for:
+- forms and form validation;
+- search fields, autocomplete and typeahead;
+- focus management and keyboard navigation;
+- accessibility and screen reader behavior;
+- responsive layouts and modern CSS;
+- browser APIs and progressive enhancement;
+- frontend performance.
+
+Follow the official skill's search → retrieve → verify workflow.
+Use its guidance before choosing a browser API, UI pattern or adding
+a dependency. Check browser compatibility and apply recommended
+fallbacks where necessary.
+
+Do not invoke Modern Web Guidance for backend-only work,
+infrastructure, tooling or trivial changes that do not affect
+web platform behavior.
+
+Project-specific requirements take precedence:
+- `rules/frontend.md`;
+- `rules/non-technical-ux.md`;
+- `frontend/AGENTS.md`;
+- `frontend-ux` skill;
+- existing application architecture and dependencies.
+
+Modern Web Guidance supplements these project rules; it does not
+replace them or authorize unrelated architectural changes.
+
+Do not introduce runtime dependencies merely because a guide
+demonstrates a particular browser API.
+
+Preserve the existing React, TypeScript, TanStack Query,
+shadcn/ui and Radix UI architecture unless a concrete reason
+justifies changing it.
+
 ## Architecture recommendation
 
 - React + TypeScript + Vite SPA. Preserve the existing frontend and frontend/AGENTS.md; do not scaffold over the application.

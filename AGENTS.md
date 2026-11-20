@@ -39,7 +39,7 @@
 
 Перед работой с Go-кодом соблюдай `backend/AGENTS.md` и `rules/go.md`.
 Для архитектуры используй `rules/architecture.md`; для HTTP-контракта — `rules/api-contract.md`; для тестов — `rules/testing.md`; для данных — `rules/data-safety.md`.
-Для специальных задач загружай подходящий skill из `.agents/skills/`; до завершения переноса используй существующие skills в .opencode/skills/.
+Для специальных задач загружай подходящий skill из `.agents/skills/`.
 
 ## Frontend
 
