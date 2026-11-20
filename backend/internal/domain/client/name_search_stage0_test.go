@@ -8,8 +8,7 @@ import (
 )
 
 func TestStage0Aliases(t *testing.T) {
-	groups := [][]string{{"ваня", "иван"}, {"саша", "александр", "александра"}, {"соня", "софья"}, {"даша", "дарья"}, {"настя", "анастасия"}, {"маша", "мария"}, {"тима", "тимофей"}, {"лиза", "елизавета"}, {"даня", "даниил"}, {"варя", "варвара"}, {"лёва", "лев"}, {"петя", "пётр"}}
-	for _, g := range groups {
+	for _, g := range nameAliasGroups {
 		for _, q := range g {
 			for _, name := range g {
 				t.Run(q+"/"+name, func(t *testing.T) {
@@ -38,7 +37,7 @@ func TestStage0SearchScores(t *testing.T) {
 		{"соколоФ", "соколов", 300}, {"соХколов", "соколов", 300}, {"соолов", "соколов", 300}, {"сооклов", "соколов", 300},
 		{"сакалоф", "соколов", 0}, {"жбвг", "абвгд", 0}, {"жбвгд", "абвг", 0}, {"жбвгд", "абвгд", 300},
 		{"с", "соколов", 0}, {"ко", "соколов", 0},
-		{"абвгдежзийклмнопрстуфхцчшщэюяX", "абвгдежзийклмнопрстуфхцчшщэюя", 300},
+		{"абвгдежзийклмнопрстуфхцчшщэюяъ", "абвгдежзийклмнопрстуфхцчшщэюя", 300},
 		{"иван иван", "иван", 0}, {"иван", "иван иван", 1000}, {"иван иван", "иван иван", 2000},
 		{"иван петр", "иван иван", 0}, {"алекс александр", "александр алексей", 1700}, {"александр алекс", "александр алексей", 1700},
 		{"", "иван", 0}, {"  —,;/ ", "иван", 0},
@@ -120,5 +119,49 @@ func TestStage0All63TokensAssigned(t *testing.T) {
 	}
 	if got := MatchNameTokens(TokenizeName(strings.Join(words, " ")), candidate); got != 63000 {
 		t.Errorf("63-token assignment: %d", got)
+	}
+}
+
+func TestStage0All63InterchangeableTokensAssigned(t *testing.T) {
+	tokens := TokenizeName(strings.Repeat("я ", 63))
+	if got := MatchNameTokens(tokens, tokens); got != 63000 {
+		t.Fatalf("complete interchangeable assignment: %d, want 63000", got)
+	}
+}
+
+func TestStage0AssignmentMatchesExhaustiveSearch(t *testing.T) {
+	// Малые графы с разными весами и отсутствующими рёбрами проверяются
+	// независимым полным перебором; большие графы здесь не перебираются.
+	words := []string{"я", "ю", "иван", "иванов", "ван", "соколов", "сооклов", "со"}
+	for seed := 0; seed < 300; seed++ {
+		n, m := 1+seed%4, 1+(seed/4)%5
+		query, candidate := make([]SearchToken, n), make([]SearchToken, m)
+		for i := range query {
+			query[i] = TokenizeName(words[(seed+i*3)%len(words)])[0]
+		}
+		for j := range candidate {
+			candidate[j] = TokenizeName(words[(seed/7+j*5)%len(words)])[0]
+		}
+		var enumerate func(int, uint) int
+		enumerate = func(i int, used uint) int {
+			if i == n {
+				return 0
+			}
+			best := -1
+			for j := range candidate {
+				score := matchToken(query[i], candidate[j])
+				if used&(1<<j) != 0 || score == 0 {
+					continue
+				}
+				if rest := enumerate(i+1, used|(1<<j)); rest >= 0 {
+					best = max(best, score+rest)
+				}
+			}
+			return best
+		}
+		want := max(0, enumerate(0, 0))
+		if got := MatchNameTokens(query, candidate); got != want {
+			t.Fatalf("seed %d (%dx%d): got %d, want %d", seed, n, m, got, want)
+		}
 	}
 }

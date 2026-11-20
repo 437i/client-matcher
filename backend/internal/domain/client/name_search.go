@@ -1,7 +1,6 @@
 package client
 
 import (
-	"sort"
 	"strings"
 	"unicode"
 )
@@ -144,90 +143,81 @@ func MatchNameTokens(query, candidate []SearchToken) int {
 		return 0
 	}
 
-	scores := make([][]int, len(query))
-	order := make([]int, len(query))
+	n, m := len(query), len(candidate)
+	scores := make([][]int, n)
 	for i := range query {
-		order[i] = i
-		scores[i] = make([]int, len(candidate))
+		scores[i] = make([]int, m)
 		for j := range candidate {
 			scores[i][j] = matchToken(query[i], candidate[j])
 		}
 	}
 
-	// Сначала назначаем наиболее специфичные слова запроса. Это сокращает
-	// перебор и не даёт короткому слову занять единственный подходящий токен.
-	sort.SliceStable(order, func(i, j int) bool {
-		left, right := order[i], order[j]
-		leftCount, rightCount := 0, 0
-		leftBest, rightBest := 0, 0
-		for k := range candidate {
-			if scores[left][k] > 0 {
-				leftCount++
-				if scores[left][k] > leftBest {
-					leftBest = scores[left][k]
+	// Прямоугольный алгоритм Венгера минимизирует отрицательные оценки.
+	// Нулевые рёбра исключены: если увеличивающего пути нет, полного назначения нет.
+	// Индекс 0 — фиктивный столбец для начала увеличивающего пути.
+	// Назначение занимает O(n²m) времени и O(nm) памяти вместе с scores.
+	rowPotential := make([]int, n+1)
+	columnPotential := make([]int, m+1)
+	assignedRow := make([]int, m+1)
+	previousColumn := make([]int, m+1)
+	const infinity = int(^uint(0)>>1) / 4
+	for row := 1; row <= n; row++ {
+		assignedRow[0] = row
+		column := 0
+		minimum := make([]int, m+1)
+		visited := make([]bool, m+1)
+		for j := 1; j <= m; j++ {
+			minimum[j] = infinity
+		}
+		for {
+			visited[column] = true
+			currentRow := assignedRow[column]
+			delta, nextColumn := infinity, 0
+			for j := 1; j <= m; j++ {
+				if visited[j] {
+					continue
+				}
+				if score := scores[currentRow-1][j-1]; score > 0 {
+					reducedCost := -score - rowPotential[currentRow] - columnPotential[j]
+					if reducedCost < minimum[j] {
+						minimum[j] = reducedCost
+						previousColumn[j] = column
+					}
+				}
+				// Минимум мог прийти от другой строки текущего чередующегося дерева.
+				if minimum[j] < delta {
+					delta, nextColumn = minimum[j], j
 				}
 			}
-			if scores[right][k] > 0 {
-				rightCount++
-				if scores[right][k] > rightBest {
-					rightBest = scores[right][k]
+			if nextColumn == 0 {
+				return 0
+			}
+			for j := 0; j <= m; j++ {
+				if visited[j] {
+					rowPotential[assignedRow[j]] += delta
+					columnPotential[j] -= delta
+				} else if minimum[j] != infinity {
+					minimum[j] -= delta
 				}
 			}
-		}
-		if leftCount != rightCount {
-			return leftCount < rightCount
-		}
-		if leftBest != rightBest {
-			return leftBest > rightBest
-		}
-		return primaryValue(query[left]) > primaryValue(query[right])
-	})
-
-	type state struct {
-		queryIndex int
-		used       uint64
-	}
-	memo := make(map[state]int)
-	const impossible = -1
-
-	var assign func(int, uint64) int
-	assign = func(index int, used uint64) int {
-		if index == len(order) {
-			return 0
-		}
-		key := state{queryIndex: index, used: used}
-		if cached, ok := memo[key]; ok {
-			return cached
-		}
-
-		queryIndex := order[index]
-		best := impossible
-		for candidateIndex, score := range scores[queryIndex] {
-			bit := uint64(1) << candidateIndex
-			if score == 0 || used&bit != 0 {
-				continue
-			}
-			rest := assign(index+1, used|bit)
-			if rest != impossible && score+rest > best {
-				best = score + rest
+			column = nextColumn
+			if assignedRow[column] == 0 {
+				break
 			}
 		}
-		memo[key] = best
-		return best
+		for column != 0 {
+			previous := previousColumn[column]
+			assignedRow[column] = assignedRow[previous]
+			column = previous
+		}
 	}
-
-	score := assign(0, 0)
-	if score < 0 {
-		return 0
+	total := 0
+	for column := 1; column <= m; column++ {
+		if row := assignedRow[column]; row != 0 {
+			total += scores[row-1][column-1]
+		}
 	}
-	return score
-}
-
-func primaryValue(token SearchToken) string {
-	if len(token.Forms) == 0 {
-		return ""
-	}
-	return token.Forms[0].Value
+	return total
 }
 
 func matchToken(query, candidate SearchToken) int {
