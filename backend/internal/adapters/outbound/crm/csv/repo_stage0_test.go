@@ -2,6 +2,7 @@ package csv
 
 import (
 	"context"
+	encodingcsv "encoding/csv"
 	"errors"
 	"fmt"
 	"slices"
@@ -92,15 +93,19 @@ func TestStage0CSVLoading(t *testing.T) {
 		{"header only", "id,title,birthday,clinic\n", []string{}, false},
 		{"blank lines and quoted newline", "\ufeffID,TITLE,BIRTHDAY,CLINIC\n\n1,Ёлкин Пётр,2000-01-01,\"Синтетическая, \"\"организация\"\"\nстрока\"\n", []string{"1"}, false},
 		{"bad quote then valid row", "id,title,birthday,clinic\n1,Плохая\" Строка,2000-01-01,A\n2,Ёлкин Пётр,2000-01-01,B\n", []string{"2"}, false},
-		{"unclosed final quote", "id,title,birthday,clinic\n1,Ёлкин Пётр,2000-01-01,A\n2,\"Незакрытая строка,2000-01-01,B\n", []string{"1"}, false},
+		{"unclosed final quote", "id,title,birthday,clinic\n1,Ёлкин Пётр,2000-01-01,A\n2,\"Незакрытая строка,2000-01-01,B\n", nil, true},
+		{"unclosed middle quote", "id,title,birthday,clinic\n1,Ёлкин Пётр,2000-01-01,A\n2,\"Незакрытая строка,2000-01-01,B\n3,Сидоров Иван,2000-01-01,C\n", nil, true},
 		{"too many columns", "id,title,birthday,clinic\n1,Ёлкин Пётр,2000-01-01,A,extra\n2,Ёлкин Пётр,2000-01-01,B\n", []string{"2"}, false},
 		{"trimmed duplicate IDs", "id,title,birthday,clinic\n1,Ёлкин Пётр,2000-01-01,A\n 1 ,Ёлкин Пётр,2000-01-01,B\n", nil, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo, err := NewCSVCRMRepo(writeCSV(t, tc.content))
 			if tc.fail {
-				if err == nil {
-					t.Fatal("expected loading error")
+				if err == nil || repo != nil {
+					t.Fatal("expected loading error without partial repository")
+				}
+				if strings.HasPrefix(tc.name, "unclosed") && !errors.Is(err, encodingcsv.ErrQuote) {
+					t.Fatalf("got %v, want csv.ErrQuote", err)
 				}
 				return
 			}

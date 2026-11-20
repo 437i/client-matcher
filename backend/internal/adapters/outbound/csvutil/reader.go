@@ -20,8 +20,8 @@ type Row struct {
 // ReadFile читает CSV-файл, проверяет заголовок и возвращает строки данных.
 //
 // Ошибка уровня файла (нет файла, не тот заголовок, ошибка чтения) — это error.
-// Битые строки (не то число колонок, незакрытые кавычки) пропускаются с предупреждением:
-// одна плохая запись не должна останавливать весь сервис.
+// Строки с неверным числом колонок и восстанавливаемой ErrBareQuote пропускаются.
+// ErrQuote фатальна: парсер мог поглотить следующие записи, и продолжать небезопасно.
 func ReadFile(path string, header []string) ([]Row, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -48,6 +48,9 @@ func ReadFile(path string, header []string) ([]Row, error) {
 			break
 		}
 		if err != nil {
+			if errors.Is(err, csv.ErrQuote) {
+				return nil, fmt.Errorf("read %s: %w", path, err)
+			}
 			if parseErr, ok := errors.AsType[*csv.ParseError](err); ok {
 				slog.Warn("csv: skip malformed row", "file", path, "line", parseErr.StartLine, "error", err)
 				continue
