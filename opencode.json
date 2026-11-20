@@ -1,0 +1,69 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "rules/*.md"
+  ],
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
+  "permission": {
+    "read": {
+      "*": "allow",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/.env.example": "allow",
+      "**/secrets/**": "deny",
+      "**/auth.json": "deny"
+    },
+    "edit": {
+      "*": "allow",
+      "**/.env": "deny",
+      "**/.env.*": "deny",
+      "**/secrets/**": "deny",
+      "backend/migrations/**": "ask",
+      "**/auth.json": "deny"
+    },
+    "bash": {
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git branch --show-current": "allow",
+      "git rev-parse*": "allow",
+      "git diff --check": "allow",
+      "go test*": "allow",
+      "go vet*": "allow",
+      "go build*": "allow",
+      "go list*": "allow",
+      "go mod verify": "allow",
+      "gofmt*": "allow",
+      "openspec *": "allow",
+      "cd backend && go test*": "allow",
+      "cd backend && go vet*": "allow",
+      "cd backend && go build*": "allow",
+      "cd backend && go list*": "allow",
+      "docker compose ps": "allow",
+      "git push*": "deny",
+      "git reset --hard*": "deny",
+      "git clean*": "deny",
+      "rm -rf*": "deny",
+      "docker compose down -v*": "deny",
+      "docker volume rm*": "deny",
+      "docker system prune*": "deny",
+      "docker compose config -q": "ask"
+    },
+    "skill": "allow",
+    "task": "allow",
+    "external_directory": "ask"
+  },
+  "agent": {
+    "plan": {
+      "permission": {
+        "edit": "deny",
+        "bash": "ask"
+      }
+    }
+  }
+}

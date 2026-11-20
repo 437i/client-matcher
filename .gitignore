@@ -14,3 +14,7 @@
 
 # Промежуточные файлы генерации спецификации
 /backend/openapi/.stage/
+
+# Python development checks
+__pycache__/
+*.pyc
