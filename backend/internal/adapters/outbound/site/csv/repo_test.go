@@ -23,7 +23,9 @@ func TestSiteRepo(t *testing.T) {
 	repo, err := NewCSVSiteRepo(writeCSV(t, "id,title,birthday\n"+
 		"3586,Ваня Иванов,1982-04-15\n"+
 		"3587,Алим Бек кызы,1972-11-04\n"+ // фамилия из двух слов
-		"3588,Одиночка,1990-01-01\n")) // битая строка пропускается
+		"3588,Одиночка,\n"+
+		"empty,,\n"+
+		"bad,Имя Фамилия,2020-02-30\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +35,7 @@ func TestSiteRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cl.ShortName != "Ваня" || cl.LastName != "Иванов" || cl.Birthday != (client.Date{Day: 15, Month: 4, Year: 1982}) {
+	if cl.ShortName != "Ваня" || cl.LastName != "Иванов" || (cl.Birthday == nil || *cl.Birthday != (client.Date{Day: 15, Month: 4, Year: 1982})) {
 		t.Errorf("unexpected record: %+v", cl)
 	}
 
@@ -42,7 +44,18 @@ func TestSiteRepo(t *testing.T) {
 		t.Errorf("unexpected record: %+v, err %v", multi, err)
 	}
 
-	for _, id := range []string{"3588", "nope"} {
+	cl.Birthday.Year = 1
+	again, err := repo.GetByID(ctx, "3586")
+	if err != nil || again.Birthday.Year != 1982 {
+		t.Fatalf("date copy: %+v, %v", again, err)
+	}
+	for id, name := range map[string]string{"3588": "Одиночка", "empty": ""} {
+		record, err := repo.GetByID(ctx, id)
+		if err != nil || record.UnstructuredName != name || record.LastName != "" || record.ShortName != "" || record.Birthday != nil {
+			t.Fatalf("unknown roles: %+v, %v", record, err)
+		}
+	}
+	for _, id := range []string{"bad", "nope"} {
 		if _, err := repo.GetByID(ctx, id); !errors.Is(err, client.ErrSiteNotFound) {
 			t.Errorf("GetByID(%q): got %v, want ErrSiteNotFound", id, err)
 		}

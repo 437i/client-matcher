@@ -25,7 +25,7 @@ func MatchClients(crmClient client.CRMClient, siteClient client.SiteClient) erro
 	}
 
 	// Проверяем корректность дат.
-	if !crmClient.Birthday.IsValid() || !siteClient.Birthday.IsValid() {
+	if crmClient.Birthday == nil || siteClient.Birthday == nil || !crmClient.Birthday.IsValid() || !siteClient.Birthday.IsValid() {
 		return ErrInvalidBirthday
 	}
 
@@ -35,7 +35,7 @@ func MatchClients(crmClient client.CRMClient, siteClient client.SiteClient) erro
 	}
 
 	// Сравниваем даты рождения.
-	if crmClient.Birthday != siteClient.Birthday {
+	if *crmClient.Birthday != *siteClient.Birthday {
 		return ErrBirthdayMismatch
 	}
 	return nil

@@ -3,8 +3,12 @@ package csv
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/json"
+	"fmt"
 	"os"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -34,11 +38,13 @@ func TestStage0FullDataset(t *testing.T) {
 		t.Fatal(err)
 	}
 	reversed := newRepo(t, reversedData.String())
+	ordered := map[string][]string{}
 	for id, source := range repo.byID {
 		got, err := repo.Search(context.Background(), source.FullName(), 200)
 		if err != nil {
 			t.Fatal(err)
 		}
+		ordered["crm:"+id] = ids(got)
 		seen := map[string]bool{}
 		for _, c := range got {
 			if seen[c.ID] {
@@ -50,7 +56,7 @@ func TestStage0FullDataset(t *testing.T) {
 		for _, c := range got {
 			if c.ID == id {
 				found = true
-				if c != source {
+				if !reflect.DeepEqual(c, source) {
 					t.Fatalf("record %s changed", id)
 				}
 			}
@@ -100,7 +106,8 @@ func TestStage0FullDataset(t *testing.T) {
 		if want, ok := known[row[0]]; ok && !slices.Equal(ids(first), want) {
 			t.Errorf("site %s: got %v, want %v", row[0], ids(first), want)
 		}
-		if len(first) > 50 || !slices.Equal(first, second) {
+		ordered["site:"+row[0]] = ids(first)
+		if len(first) > 50 || !reflect.DeepEqual(first, second) {
 			t.Errorf("unstable site query %s", row[0])
 		}
 	}
@@ -141,13 +148,20 @@ func TestStage0FullDataset(t *testing.T) {
 			}
 		})
 	}
+	encoded, err := json.Marshal(ordered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digest := fmt.Sprintf("%x", sha256.Sum256(encoded)); digest != "ab255e5cbdf56331f7ea20fa98f76fbed1e74a9342265dc710391bc00ac4c6df" {
+		t.Fatalf("ordered search snapshot: %s", digest)
+	}
 	// The known date discrepancy must not remove the selected search candidate.
 	s, err := site.GetByID(context.Background(), "1066")
 	if err != nil {
 		t.Fatal(err)
 	}
 	c := repo.byID["8680"]
-	if s.Birthday == c.Birthday {
+	if s.Birthday == nil || c.Birthday == nil || *s.Birthday == *c.Birthday {
 		t.Fatal("fixture must retain differing birthdays")
 	}
 	if c.FullName() != "Волков Александр Тимурович" {

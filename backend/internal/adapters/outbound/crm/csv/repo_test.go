@@ -54,7 +54,7 @@ func TestGetByID(t *testing.T) {
 	if cl.LastName != "Иванов" || cl.FirstName != "Иван" || cl.Patronymic != "Бек кызы" {
 		t.Errorf("unexpected name: %+v", cl)
 	}
-	if cl.Birthday != (client.Date{Day: 15, Month: 4, Year: 1982}) {
+	if cl.Birthday == nil || *cl.Birthday != (client.Date{Day: 15, Month: 4, Year: 1982}) {
 		t.Errorf("unexpected birthday: %+v", cl.Birthday)
 	}
 
@@ -172,11 +172,12 @@ func TestSearchRanksExactMatchesBeforeBroaderMatches(t *testing.T) {
 func TestSearchResultIsIndependentCopy(t *testing.T) {
 	repo := newRepo(t, crmData)
 	first, _ := repo.Search(context.Background(), "Иванов", 10)
+	first[0].Birthday.Year = 1
 	first[0].Clinic = "changed"
 	first[0].Patronymic = "changed"
 
 	again, _ := repo.GetByID(context.Background(), "1352")
-	if again.Clinic == "changed" || again.Patronymic == "changed" {
+	if again.Birthday.Year == 1 || again.Clinic == "changed" || again.Patronymic == "changed" {
 		t.Error("mutating a result must not affect the repository")
 	}
 }
@@ -191,12 +192,12 @@ func TestLoadSkipsBadRowsAndHandlesBOM(t *testing.T) {
 		"5,Орлов Олег,1982-04-15,E\n"
 	repo := newRepo(t, content)
 
-	for _, id := range []string{"1", "5"} {
+	for _, id := range []string{"1", "2", "5"} {
 		if _, err := repo.GetByID(context.Background(), id); err != nil {
 			t.Errorf("record %s must be loaded: %v", id, err)
 		}
 	}
-	for _, id := range []string{"2", "3", "4"} {
+	for _, id := range []string{"3", "4"} {
 		if _, err := repo.GetByID(context.Background(), id); !errors.Is(err, client.ErrCRMNotFound) {
 			t.Errorf("record %s must be skipped, got %v", id, err)
 		}
@@ -220,4 +221,24 @@ func TestLoadFileLevelErrors(t *testing.T) {
 			t.Error("expected error")
 		}
 	})
+}
+
+func TestIncompleteRows(t *testing.T) {
+	repo := newRepo(t, "id,title,birthday,clinic\none,Саша,,A\nempty,,,A\nbad,Тестов Иван,0000-01-01,A\n")
+	ctx := context.Background()
+	for _, id := range []string{"one", "empty"} {
+		c, err := repo.GetByID(ctx, id)
+		if err != nil || c.FirstName != "" || c.LastName != "" || c.Patronymic != "" || c.Birthday != nil || (id == "one" && c.UnstructuredName != "Саша") {
+			t.Fatalf("unknown roles: %+v, %v", c, err)
+		}
+	}
+	if _, err := repo.GetByID(ctx, "bad"); !errors.Is(err, client.ErrCRMNotFound) {
+		t.Fatalf("bad date: %v", err)
+	}
+	for query, want := range map[string]int{"саша": 1, "александр": 0, "": 0} {
+		got, err := repo.Search(ctx, query, 10)
+		if err != nil || len(got) != want {
+			t.Fatalf("search %q: %v, %v", query, got, err)
+		}
+	}
 }

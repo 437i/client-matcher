@@ -48,30 +48,18 @@ func parseRow(f []string) (client.SiteClient, error) {
 	if f[0] == "" {
 		return client.SiteClient{}, errors.New("empty id")
 	}
-	shortName, lastName, err := parseTitle(f[1])
+	birthday, err := client.ParseOptionalDate(f[2])
 	if err != nil {
 		return client.SiteClient{}, err
 	}
-	birthday, err := client.ParseDate(f[2])
-	if err != nil {
-		return client.SiteClient{}, err
-	}
-	return client.SiteClient{
-		ID:        f[0],
-		ShortName: shortName,
-		LastName:  lastName,
-		Birthday:  birthday,
-	}, nil
-}
-
-// parseTitle разбирает «Имя Фамилия»: первое слово — имя (как на сайте, часто
-// уменьшительное), всё остальное — фамилия (может состоять из нескольких слов).
-func parseTitle(title string) (shortName, lastName string, err error) {
-	parts := strings.Fields(title)
+	parts := strings.Fields(f[1])
+	cl := client.SiteClient{ID: f[0], Birthday: birthday}
 	if len(parts) < 2 {
-		return "", "", fmt.Errorf("unexpected site title: want \"Имя Фамилия\"")
+		cl.UnstructuredName = f[1]
+	} else {
+		cl.ShortName, cl.LastName = parts[0], strings.Join(parts[1:], " ")
 	}
-	return parts[0], strings.Join(parts[1:], " "), nil
+	return cl, nil
 }
 
 func (r *CSVSiteRepo) GetByID(ctx context.Context, id string) (client.SiteClient, error) {
@@ -84,5 +72,6 @@ func (r *CSVSiteRepo) GetByID(ctx context.Context, id string) (client.SiteClient
 		return client.SiteClient{}, client.ErrSiteNotFound
 	}
 
+	cl.Birthday = client.CloneDate(cl.Birthday)
 	return cl, nil
 }

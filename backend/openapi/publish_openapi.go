@@ -21,7 +21,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	yaml "go.yaml.in/yaml/v4"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -64,6 +66,15 @@ func run() error {
 		return fmt.Errorf("read staged %s: %w", yamlFile, err)
 	}
 
+	stagedJSON, err = normalizeNullable(stagedJSON, json.Unmarshal, func(value any) ([]byte, error) { return json.MarshalIndent(value, "", "    ") })
+	if err != nil {
+		return fmt.Errorf("normalize JSON nullable fields: %w", err)
+	}
+	stagedYAML, err = normalizeNullable(stagedYAML, yaml.Unmarshal, yaml.Marshal)
+	if err != nil {
+		return fmt.Errorf("normalize YAML nullable fields: %w", err)
+	}
+
 	jsonDoc, err := load(stagedJSON)
 	if err != nil {
 		return fmt.Errorf("%s: %w", jsonFile, err)
@@ -92,6 +103,33 @@ func run() error {
 		fmt.Fprintf(os.Stderr, "publish openapi: warning: remove %s: %v\n", stageDir, err)
 	}
 	return nil
+}
+
+// Swag emits x-nullable; OpenAPI 3.1 requires a JSON Schema type union.
+func normalizeNullable(data []byte, decode func([]byte, any) error, encode func(any) ([]byte, error)) ([]byte, error) {
+	var doc map[string]any
+	if err := decode(data, &doc); err != nil {
+		return nil, err
+	}
+	components, _ := doc["components"].(map[string]any)
+	schemas, _ := components["schemas"].(map[string]any)
+	for _, value := range schemas {
+		schema, _ := value.(map[string]any)
+		props, _ := schema["properties"].(map[string]any)
+		for _, value := range props {
+			prop, _ := value.(map[string]any)
+			if prop["x-nullable"] != true {
+				continue
+			}
+			typ, ok := prop["type"].(string)
+			if !ok {
+				return nil, fmt.Errorf("x-nullable requires a single schema type")
+			}
+			prop["type"] = []string{typ, "null"}
+			delete(prop, "x-nullable")
+		}
+	}
+	return encode(doc)
 }
 
 // load разбирает документ и проверяет его как OpenAPI 3.1.

@@ -85,6 +85,9 @@ func TokenizeSearchQuery(value string) []SearchToken {
 // Словарь кратких имён применяется только к FirstName, но не к фамилии или
 // отчеству. Исходные поля CRM при этом не изменяются.
 func TokenizeCRMName(value CRMClient) []SearchToken {
+	if value.UnstructuredName != "" {
+		return TokenizeName(value.UnstructuredName)
+	}
 	tokens := make([]SearchToken, 0, 5)
 	tokens = append(tokens, tokenizeName(value.LastName, false, false)...)
 	tokens = append(tokens, tokenizeName(value.FirstName, true, true)...)

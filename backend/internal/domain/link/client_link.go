@@ -12,3 +12,14 @@ type ClientLink struct {
 	SiteID    string
 	CreatedAt time.Time
 }
+
+type Decision struct {
+	CRMID, SiteID string
+	RuleVersion   int
+	Confirmation  *Confirmation
+}
+type Confirmation struct {
+	Reason string
+	Codes  []string
+	At     time.Time
+}

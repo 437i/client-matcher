@@ -16,7 +16,7 @@ func TestMatchClients(t *testing.T) {
 
 	crm := client.CRMClient{
 		LastName: "Королёв",
-		Birthday: birthday,
+		Birthday: &birthday,
 	}
 
 	tests := []struct {
@@ -30,7 +30,7 @@ func TestMatchClients(t *testing.T) {
 			crm:  crm,
 			site: client.SiteClient{
 				LastName: "Королёв",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			want: nil,
 		},
@@ -39,7 +39,7 @@ func TestMatchClients(t *testing.T) {
 			crm:  crm,
 			site: client.SiteClient{
 				LastName: "  КОРОЛЁВ ",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			want: nil,
 		},
@@ -48,7 +48,7 @@ func TestMatchClients(t *testing.T) {
 			crm:  crm,
 			site: client.SiteClient{
 				LastName: "Королев",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			want: nil,
 		},
@@ -57,7 +57,7 @@ func TestMatchClients(t *testing.T) {
 			crm:  crm,
 			site: client.SiteClient{
 				LastName: "Петров",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			want: ErrLastNameMismatch,
 		},
@@ -66,7 +66,7 @@ func TestMatchClients(t *testing.T) {
 			crm:  crm,
 			site: client.SiteClient{
 				LastName: "Королёв",
-				Birthday: client.Date{Day: 16, Month: 4, Year: 1982},
+				Birthday: &client.Date{Day: 16, Month: 4, Year: 1982},
 			},
 			want: ErrBirthdayMismatch,
 		},
@@ -74,11 +74,11 @@ func TestMatchClients(t *testing.T) {
 			name: "empty crm last name",
 			crm: client.CRMClient{
 				LastName: "   ",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			site: client.SiteClient{
 				LastName: "Королёв",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			want: ErrEmptyLastName,
 		},
@@ -87,7 +87,7 @@ func TestMatchClients(t *testing.T) {
 			crm:  crm,
 			site: client.SiteClient{
 				LastName: " ",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			want: ErrEmptyLastName,
 		},
@@ -95,11 +95,11 @@ func TestMatchClients(t *testing.T) {
 			name: "invalid crm birthday",
 			crm: client.CRMClient{
 				LastName: "Королёв",
-				Birthday: client.Date{Day: 31, Month: 4, Year: 1982},
+				Birthday: &client.Date{Day: 31, Month: 4, Year: 1982},
 			},
 			site: client.SiteClient{
 				LastName: "Королёв",
-				Birthday: birthday,
+				Birthday: &birthday,
 			},
 			want: ErrInvalidBirthday,
 		},
@@ -108,7 +108,7 @@ func TestMatchClients(t *testing.T) {
 			crm:  crm,
 			site: client.SiteClient{
 				LastName: "Королёв",
-				Birthday: client.Date{},
+				Birthday: &client.Date{},
 			},
 			want: ErrInvalidBirthday,
 		},

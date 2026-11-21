@@ -15,9 +15,11 @@ import (
 
 	web "github.com/437i/client-matcher/backend/internal/adapters/inbound/http"
 	"github.com/437i/client-matcher/backend/internal/adapters/inbound/http/handlers"
+	tokenOutbound "github.com/437i/client-matcher/backend/internal/adapters/outbound"
 	crmCSV "github.com/437i/client-matcher/backend/internal/adapters/outbound/crm/csv"
 	linkPG "github.com/437i/client-matcher/backend/internal/adapters/outbound/link/postgres"
 	siteCSV "github.com/437i/client-matcher/backend/internal/adapters/outbound/site/csv"
+	"github.com/437i/client-matcher/backend/internal/application/ports"
 	"github.com/437i/client-matcher/backend/internal/application/services"
 	"github.com/437i/client-matcher/backend/internal/platform/config"
 	"github.com/437i/client-matcher/backend/internal/platform/db"
@@ -62,11 +64,17 @@ func run() error {
 	linkRepo := linkPG.NewPGLinkRepo(pool)
 
 	searchService := services.NewClientSearchService(crmRepo, siteRepo)
-	linkService := services.NewClientLinkService(crmRepo, siteRepo, linkRepo)
+	tokenKey, err := tokenOutbound.GenerateTokenKey()
+	if err != nil {
+		return fmt.Errorf("generate assessment token key: %w", err)
+	}
+	tokenCodec := tokenOutbound.NewHMACToken(tokenKey, ports.SystemClock{})
+	linkService := services.NewClientLinkService(crmRepo, siteRepo, linkRepo, tokenCodec, ports.SystemClock{})
 
 	router, err := web.NewRouter(
 		handlers.NewClientHandler(searchService),
 		handlers.NewLinkHandler(linkService),
+		handlers.NewAssessmentHandler(linkService),
 		handlers.NewHealthHandler(pool.Ping),
 	)
 	if err != nil {

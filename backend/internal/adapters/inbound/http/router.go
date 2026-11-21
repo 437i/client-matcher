@@ -11,6 +11,7 @@ import (
 func NewRouter(
 	clientHandler *handlers.ClientHandler,
 	linkHandler *handlers.LinkHandler,
+	assessmentHandler *handlers.AssessmentHandler,
 	healthHandler *handlers.HealthHandler,
 ) (*gin.Engine, error) {
 	engine := gin.New()
@@ -24,10 +25,10 @@ func NewRouter(
 	if err := engine.SetTrustedProxies(nil); err != nil {
 		return nil, fmt.Errorf("set trusted proxies: %w", err)
 	}
-
 	engine.GET("/healthz", healthHandler.Health)
 
 	v1 := engine.Group("/api/v1")
+	v1.POST("/link-assessments", assessmentHandler.Assess)
 
 	v1.GET("/crm-clients", clientHandler.Search)
 	v1.GET("/site-clients/:id", clientHandler.GetSiteClient)

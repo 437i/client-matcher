@@ -24,8 +24,7 @@ type record struct {
 }
 
 // CSVCRMRepo — реализация ports.CRMReader поверх CSV-файла. После создания
-// данные только читаются, поэтому мьютекс не нужен. Все поля CRMClient —
-// значения, так что возвращаемые копии не связаны с внутренним состоянием.
+// данные только читаются, поэтому мьютекс не нужен.
 type CSVCRMRepo struct {
 	records []record
 	byID    map[string]client.CRMClient
@@ -69,32 +68,18 @@ func parseRow(f []string) (client.CRMClient, error) {
 	if f[0] == "" {
 		return client.CRMClient{}, errors.New("empty id")
 	}
-	lastName, firstName, patronymic, err := parseTitle(f[1])
+	birthday, err := client.ParseOptionalDate(f[2])
 	if err != nil {
 		return client.CRMClient{}, err
 	}
-	birthday, err := client.ParseDate(f[2])
-	if err != nil {
-		return client.CRMClient{}, err
-	}
-	return client.CRMClient{
-		ID:         f[0],
-		LastName:   lastName,
-		FirstName:  firstName,
-		Patronymic: patronymic,
-		Birthday:   birthday,
-		Clinic:     f[3],
-	}, nil
-}
-
-// parseTitle разбирает «Фамилия Имя [Отчество...]»; отчество может состоять
-// из нескольких слов («Бек кызы»).
-func parseTitle(title string) (lastName, firstName, patronymic string, err error) {
-	parts := strings.Fields(title)
+	parts := strings.Fields(f[1])
+	cl := client.CRMClient{ID: f[0], Birthday: birthday, Clinic: f[3]}
 	if len(parts) < 2 {
-		return "", "", "", fmt.Errorf("unexpected crm title: want \"Фамилия Имя [Отчество]\"")
+		cl.UnstructuredName = f[1]
+	} else {
+		cl.LastName, cl.FirstName, cl.Patronymic = parts[0], parts[1], strings.Join(parts[2:], " ")
 	}
-	return parts[0], parts[1], strings.Join(parts[2:], " "), nil
+	return cl, nil
 }
 
 // Search ищет по любым словам ФИО, независимо от их порядка. Сначала идут
@@ -140,7 +125,9 @@ func (r *CSVCRMRepo) Search(ctx context.Context, query string, limit int) ([]cli
 		ranked = ranked[:limit]
 	}
 	for _, item := range ranked {
-		result = append(result, item.record.client)
+		cl := item.record.client
+		cl.Birthday = client.CloneDate(cl.Birthday)
+		result = append(result, cl)
 	}
 
 	return result, nil
@@ -156,5 +143,6 @@ func (r *CSVCRMRepo) GetByID(ctx context.Context, id string) (client.CRMClient, 
 		return client.CRMClient{}, client.ErrCRMNotFound
 	}
 
+	cl.Birthday = client.CloneDate(cl.Birthday)
 	return cl, nil
 }

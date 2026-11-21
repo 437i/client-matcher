@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	tokenOutbound "github.com/437i/client-matcher/backend/internal/adapters/outbound"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,9 +34,9 @@ const crmData = `id,title,birthday,clinic
 `
 
 const siteData = `id,title,birthday
-3586,Ваня Иванов,1982-04-15
+3586,Иван Иванов,1982-04-15
 3587,Маша Иванова,1990-01-02
-3588,Петя Королев,2001-09-09
+3588,Пётр Королев,2001-09-09
 3589,Ваня Петров,1982-04-15
 3590,Ваня Иванов,1983-01-01
 `
@@ -50,16 +51,15 @@ type memLinkRepo struct {
 
 var _ ports.ClientLinkRepo = (*memLinkRepo)(nil)
 
-func (m *memLinkRepo) Create(_ context.Context, data link.ClientLink) (link.ClientLink, error) {
+func (m *memLinkRepo) Create(_ context.Context, data link.Decision) (link.ClientLink, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.createErr != nil {
 		return link.ClientLink{}, m.createErr
 	}
-	data.ID = uuid.New()
-	data.CreatedAt = time.Now().UTC()
-	m.links = append(m.links, data)
-	return data, nil
+	result := link.ClientLink{ID: uuid.New(), CRMID: data.CRMID, SiteID: data.SiteID, CreatedAt: time.Now().UTC()}
+	m.links = append(m.links, result)
+	return result, nil
 }
 
 func (m *memLinkRepo) List(context.Context) ([]link.ClientLink, error) {
@@ -104,9 +104,12 @@ func newTestServer(t *testing.T, linkRepo *memLinkRepo) *gin.Engine {
 		t.Fatal(err)
 	}
 
+	clock := ports.SystemClock{}
+	svc := services.NewClientLinkService(crmRepo, siteRepo, linkRepo, tokenOutbound.NewHMACToken([32]byte{1}, clock), clock)
 	router, err := web.NewRouter(
 		handlers.NewClientHandler(services.NewClientSearchService(crmRepo, siteRepo)),
-		handlers.NewLinkHandler(services.NewClientLinkService(crmRepo, siteRepo, linkRepo)),
+		handlers.NewLinkHandler(svc),
+		handlers.NewAssessmentHandler(svc),
 		handlers.NewHealthHandler(func(context.Context) error { return nil }),
 	)
 	if err != nil {
@@ -149,7 +152,7 @@ func TestSearch(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 1 || list[0].ID != "1352" || list[0].FullName != "Иванов Иван Бек кызы" || list[0].Birthday != "1982-04-15" {
+	if len(list) != 1 || list[0].ID != "1352" || list[0].FullName != "Иванов Иван Бек кызы" || list[0].Birthday == nil || *list[0].Birthday != "1982-04-15" {
 		t.Errorf("unexpected result: %+v", list)
 	}
 
@@ -196,7 +199,7 @@ func TestGetSiteClient(t *testing.T) {
 	}
 	var cl handlers.SiteClientResponse
 	_ = json.Unmarshal(rec.Body.Bytes(), &cl)
-	if cl.ID != "3586" || cl.ShortName != "Ваня" || cl.LastName != "Иванов" || cl.Birthday != "1982-04-15" {
+	if cl.ID != "3586" || cl.ShortName != "Иван" || cl.LastName != "Иванов" || cl.Birthday == nil || *cl.Birthday != "1982-04-15" {
 		t.Errorf("unexpected: %+v", cl)
 	}
 
@@ -215,13 +218,13 @@ func TestCreateLinkErrors(t *testing.T) {
 	}{
 		{"crm not found", `{"crm_id":"0","site_id":"3586"}`, nil, 404, "crm_client_not_found"},
 		{"site not found", `{"crm_id":"1352","site_id":"0"}`, nil, 404, "site_client_not_found"},
-		{"last name mismatch", `{"crm_id":"1352","site_id":"3589"}`, nil, 422, "last_name_mismatch"},
-		{"birthday mismatch", `{"crm_id":"1352","site_id":"3590"}`, nil, 422, "birthday_mismatch"},
+		{"last name mismatch", `{"crm_id":"1352","site_id":"3589"}`, nil, 422, "confirmation_required"},
+		{"birthday mismatch", `{"crm_id":"1352","site_id":"3590"}`, nil, 422, "confirmation_required"},
 		{"crm already linked", `{"crm_id":"1352","site_id":"3586"}`, link.ErrCRMAlreadyLinked, 409, "crm_already_linked"},
 		{"site already linked", `{"crm_id":"1352","site_id":"3586"}`, link.ErrSiteAlreadyLinked, 409, "site_already_linked"},
 		{"internal error is not leaked", `{"crm_id":"1352","site_id":"3586"}`, errors.New("pq: password=secret"), 500, "internal_error"},
-		{"missing field", `{"crm_id":"1352"}`, nil, 400, "invalid_body"},
-		{"blank id", `{"crm_id":"  ","site_id":"3586"}`, nil, 400, "id_empty"},
+		{"missing field", `{"crm_id":"1352"}`, nil, 400, "invalid_id"},
+		{"blank id", `{"crm_id":"  ","site_id":"3586"}`, nil, 400, "invalid_id"},
 		{"broken json", `{`, nil, 400, "invalid_body"},
 	}
 	for _, tc := range tests {
@@ -307,4 +310,15 @@ func TestHealth(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("got %d", rec.Code)
 	}
+}
+
+func (m *memLinkRepo) LookupBySourceIDs(_ context.Context, crmID, siteID string) (bool, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var crm, site bool
+	for _, record := range m.links {
+		crm = crm || record.CRMID == crmID
+		site = site || record.SiteID == siteID
+	}
+	return crm, site, nil
 }

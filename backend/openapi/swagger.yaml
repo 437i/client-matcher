@@ -1,342 +1,480 @@
 components:
-  schemas:
-    handlers.CRMClientResponse:
-      properties:
-        birthday:
-          description: YYYY-MM-DD
-          type: string
-        clinic:
-          type: string
-        first_name:
-          type: string
-        full_name:
-          type: string
-        id:
-          type: string
-        last_name:
-          type: string
-        patronymic:
-          type: string
-      type: object
-    handlers.CreateRequest:
-      properties:
-        crm_id:
-          type: string
-        site_id:
-          type: string
-      required:
-      - crm_id
-      - site_id
-      type: object
-    handlers.ErrorResponse:
-      properties:
-        code:
-          example: crm_client_not_found
-          type: string
-        message:
-          example: Клиент не найден в CRM
-          type: string
-      type: object
-    handlers.LinkResponse:
-      properties:
-        created_at:
-          description: RFC 3339, например 2026-11-11T21:00:00Z
-          type: string
-        crm_id:
-          type: string
-        id:
-          description: UUID связи
-          type: string
-        site_id:
-          type: string
-      type: object
-    handlers.SiteClientResponse:
-      properties:
-        birthday:
-          description: YYYY-MM-DD
-          type: string
-        id:
-          type: string
-        last_name:
-          type: string
-        short_name:
-          type: string
-      type: object
+    schemas:
+        handlers.AssessmentCheckResponse:
+            properties:
+                code:
+                    enum:
+                        - exact
+                        - normalized_match
+                        - alias_match
+                        - probable_match
+                        - mismatch
+                        - missing
+                    type: string
+                crm_value:
+                    type:
+                        - string
+                        - "null"
+                field:
+                    enum:
+                        - last_name
+                        - first_name
+                        - birthday
+                    type: string
+                site_value:
+                    type:
+                        - string
+                        - "null"
+            type: object
+        handlers.AssessmentRequest:
+            properties:
+                crm_id:
+                    type: string
+                site_id:
+                    type: string
+            required:
+                - crm_id
+                - site_id
+            type: object
+        handlers.AssessmentResponse:
+            properties:
+                blocked_reasons:
+                    items:
+                        type: string
+                    type: array
+                    uniqueItems: false
+                checks:
+                    items:
+                        $ref: '#/components/schemas/handlers.AssessmentCheckResponse'
+                    type: array
+                    uniqueItems: false
+                confirmation_required:
+                    type: boolean
+                expires_at:
+                    type:
+                        - string
+                        - "null"
+                status:
+                    enum:
+                        - ready
+                        - requires_confirmation
+                        - blocked
+                    type: string
+                token:
+                    type:
+                        - string
+                        - "null"
+            type: object
+        handlers.CRMClientResponse:
+            properties:
+                birthday:
+                    description: YYYY-MM-DD
+                    type:
+                        - string
+                        - "null"
+                clinic:
+                    type: string
+                first_name:
+                    type: string
+                full_name:
+                    type: string
+                id:
+                    type: string
+                last_name:
+                    type: string
+                patronymic:
+                    type: string
+            type: object
+        handlers.CreateRequest:
+            properties:
+                assessment_token:
+                    type:
+                        - string
+                        - "null"
+                confirmed:
+                    type: boolean
+                crm_id:
+                    type: string
+                reason:
+                    type: string
+                site_id:
+                    type: string
+            required:
+                - crm_id
+                - site_id
+            type: object
+        handlers.ErrorResponse:
+            properties:
+                code:
+                    example: crm_client_not_found
+                    type: string
+                message:
+                    example: Клиент не найден в CRM
+                    type: string
+            type: object
+        handlers.LinkResponse:
+            properties:
+                created_at:
+                    description: RFC 3339, например 2026-11-11T21:00:00Z
+                    type: string
+                crm_id:
+                    type: string
+                id:
+                    description: UUID связи
+                    type: string
+                site_id:
+                    type: string
+            type: object
+        handlers.SiteClientResponse:
+            properties:
+                birthday:
+                    description: YYYY-MM-DD
+                    type:
+                        - string
+                        - "null"
+                id:
+                    type: string
+                last_name:
+                    type: string
+                short_name:
+                    type: string
+            type: object
 externalDocs:
-  description: Исходный код и инструкции по запуску проекта.
-  url: https://github.com/437i/client-matcher
+    description: Исходный код и инструкции по запуску проекта.
+    url: https://github.com/437i/client-matcher
 info:
-  description: REST API для ручного сопоставления ID клиента в CRM и ID клиента на
-    сайте.
-  title: Client Matcher API
-  version: 1.0.0
+    description: REST API для ручного сопоставления ID клиента в CRM и ID клиента на сайте.
+    title: Client Matcher API
+    version: 1.0.0
 openapi: 3.1.0
 paths:
-  /api/v1/crm-clients:
-    get:
-      description: Ищет по любой части ФИО, порядок слов не важен. Поддерживает нормализацию, варианты имён, частичные совпадения и ограниченный поиск опечаток. Возвращает не более 50 кандидатов; результат не подтверждает личность.
-      parameters:
-      - description: Любая часть ФИО; порядок слов не важен
-        example: артем семенов
-        in: query
-        name: q
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/handlers.CRMClientResponse'
-                type: array
-          description: OK
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Bad Request
-        "499":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Запрос отменён клиентом (нестандартный код 499)
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Internal Server Error
-        "504":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Превышено время ожидания
-      summary: Поиск клиентов в CRM
-      tags:
-      - crm
-  /api/v1/links:
-    get:
-      description: Возвращает все сохранённые связи между клиентами CRM и сайта.
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/handlers.LinkResponse'
-                type: array
-          description: OK
-        "499":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Запрос отменён клиентом (нестандартный код 499)
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Internal Server Error
-        "504":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Превышено время ожидания
-      summary: Список связей
-      tags:
-      - links
-    post:
-      description: Создаёт связь между клиентом CRM и клиентом сайта после проверки
-        совпадения фамилии и даты рождения.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/handlers.CreateRequest'
-              description: Пара идентификаторов
-              summary: request
-        description: Пара идентификаторов
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.LinkResponse'
-          description: Created
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Bad Request
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Not Found
-        "409":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Conflict
-        "422":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Unprocessable Entity
-        "499":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Запрос отменён клиентом (нестандартный код 499)
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Internal Server Error
-        "502":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Источник вернул некорректные данные клиента
-        "504":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Превышено время ожидания
-      summary: Создать связь CRM и сайта
-      tags:
-      - links
-  /api/v1/links/export.csv:
-    get:
-      description: Отдаёт файл CSV с колонками crm_id, site_id.
-      responses:
-        "200":
-          content:
-            text/csv:
-              schema:
-                type: string
-          description: crm_id,site_id
-        "499":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Запрос отменён клиентом (нестандартный код 499)
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Внутренняя ошибка
-        "504":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Превышено время ожидания
-      summary: Выгрузка связей в CSV
-      tags:
-      - links
-  /api/v1/site-clients/{id}:
-    get:
-      description: Возвращает клиента сайта по его ID, чтобы сверить данные перед
-        сохранением связи.
-      parameters:
-      - description: ID клиента на сайте
-        example: "3586"
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.SiteClientResponse'
-          description: OK
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Bad Request
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Not Found
-        "499":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Запрос отменён клиентом (нестандартный код 499)
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Internal Server Error
-        "504":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/handlers.ErrorResponse'
-          description: Превышено время ожидания
-      summary: Клиент сайта по ID
-      tags:
-      - site
-  /healthz:
-    get:
-      description: Возвращает статус backend и доступности базы данных.
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                additionalProperties:
-                  type: string
-                type: object
-          description: OK
-        "503":
-          content:
-            application/json:
-              schema:
-                additionalProperties:
-                  type: string
-                type: object
-          description: Service Unavailable
-      summary: Проверка готовности сервиса
-      tags:
-      - system
+    /api/v1/crm-clients:
+        get:
+            description: Ищет по любой части ФИО, порядок слов не важен. Поддерживает нормализацию, варианты имён, частичные совпадения и ограниченный поиск опечаток. Возвращает не более 50 кандидатов; результат не подтверждает личность.
+            parameters:
+                - description: Любая часть ФИО; порядок слов не важен
+                  example: артем семенов
+                  in: query
+                  name: q
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                items:
+                                    $ref: '#/components/schemas/handlers.CRMClientResponse'
+                                type: array
+                    description: OK
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Bad Request
+                "499":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Запрос отменён клиентом (нестандартный код 499)
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Internal Server Error
+                "504":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Превышено время ожидания
+            summary: Поиск клиентов в CRM
+            tags:
+                - crm
+    /api/v1/link-assessments:
+        post:
+            description: Возвращает ready, requires_confirmation или blocked. Токен действует пять минут. При blocked проверки пусты, токен и срок действия равны null.
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.AssessmentRequest'
+                            description: Идентификаторы пары
+                            summary: request
+                description: Идентификаторы пары
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.AssessmentResponse'
+                    description: OK
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Bad Request
+                "413":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Request Entity Too Large
+                "499":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Запрос отменён клиентом
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Internal Server Error
+                "502":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Bad Gateway
+                "504":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Gateway Timeout
+            summary: Оценить пару CRM и сайта
+            tags:
+                - links
+    /api/v1/links:
+        get:
+            description: Возвращает все сохранённые связи между клиентами CRM и сайта.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                items:
+                                    $ref: '#/components/schemas/handlers.LinkResponse'
+                                type: array
+                    description: OK
+                "499":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Запрос отменён клиентом (нестандартный код 499)
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Internal Server Error
+                "504":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Превышено время ожидания
+            summary: Список связей
+            tags:
+                - links
+        post:
+            description: Повторно получает обе записи. Для ready достаточно двух ID. Для requires_confirmation передайте актуальный assessment_token, confirmed=true и причину длиной 1–1000 символов после обрезки пробелов. Не указывайте ФИО и даты рождения в причине.
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/handlers.CreateRequest'
+                            description: Пара идентификаторов
+                            summary: request
+                description: Пара идентификаторов
+                required: true
+            responses:
+                "201":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.LinkResponse'
+                    description: Created
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Bad Request
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Not Found
+                "409":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Conflict
+                "413":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Тело запроса превышает 16 КиБ
+                "422":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Unprocessable Entity
+                "499":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Запрос отменён клиентом (нестандартный код 499)
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Internal Server Error
+                "502":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Источник вернул некорректные данные клиента
+                "504":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Превышено время ожидания
+            summary: Создать связь CRM и сайта
+            tags:
+                - links
+    /api/v1/links/export.csv:
+        get:
+            description: Отдаёт файл CSV с колонками crm_id, site_id.
+            responses:
+                "200":
+                    content:
+                        text/csv:
+                            schema:
+                                type: string
+                    description: crm_id,site_id
+                "499":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Запрос отменён клиентом (нестандартный код 499)
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Внутренняя ошибка
+                "504":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Превышено время ожидания
+            summary: Выгрузка связей в CSV
+            tags:
+                - links
+    /api/v1/site-clients/{id}:
+        get:
+            description: Возвращает клиента сайта по его ID, чтобы сверить данные перед сохранением связи.
+            parameters:
+                - description: ID клиента на сайте
+                  example: "3586"
+                  in: path
+                  name: id
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.SiteClientResponse'
+                    description: OK
+                "400":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Bad Request
+                "404":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Not Found
+                "499":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Запрос отменён клиентом (нестандартный код 499)
+                "500":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Internal Server Error
+                "504":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Превышено время ожидания
+            summary: Клиент сайта по ID
+            tags:
+                - site
+    /healthz:
+        get:
+            description: Возвращает статус backend и доступности базы данных.
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                additionalProperties:
+                                    type: string
+                                type: object
+                    description: OK
+                "503":
+                    content:
+                        application/json:
+                            schema:
+                                additionalProperties:
+                                    type: string
+                                type: object
+                    description: Service Unavailable
+            summary: Проверка готовности сервиса
+            tags:
+                - system
 servers:
-- description: Текущий хост, на котором запущен backend.
-  url: /
+    - description: Текущий хост, на котором запущен backend.
+      url: /
 tags:
-- description: Поиск клиентов в CRM.
-  name: crm
-- description: Клиенты сайта.
-  name: site
-- description: Связи между клиентом CRM и клиентом сайта.
-  name: links
-- description: Служебные endpoints.
-  name: system
+    - description: Поиск клиентов в CRM.
+      name: crm
+    - description: Клиенты сайта.
+      name: site
+    - description: Связи между клиентом CRM и клиентом сайта.
+      name: links
+    - description: Служебные endpoints.
+      name: system

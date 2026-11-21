@@ -1,11 +1,107 @@
 {
     "components": {
         "schemas": {
+            "handlers.AssessmentCheckResponse": {
+                "properties": {
+                    "code": {
+                        "enum": [
+                            "exact",
+                            "normalized_match",
+                            "alias_match",
+                            "probable_match",
+                            "mismatch",
+                            "missing"
+                        ],
+                        "type": "string"
+                    },
+                    "crm_value": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "field": {
+                        "enum": [
+                            "last_name",
+                            "first_name",
+                            "birthday"
+                        ],
+                        "type": "string"
+                    },
+                    "site_value": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "handlers.AssessmentRequest": {
+                "properties": {
+                    "crm_id": {
+                        "type": "string"
+                    },
+                    "site_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "crm_id",
+                    "site_id"
+                ],
+                "type": "object"
+            },
+            "handlers.AssessmentResponse": {
+                "properties": {
+                    "blocked_reasons": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "checks": {
+                        "items": {
+                            "$ref": "#/components/schemas/handlers.AssessmentCheckResponse"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "confirmation_required": {
+                        "type": "boolean"
+                    },
+                    "expires_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "status": {
+                        "enum": [
+                            "ready",
+                            "requires_confirmation",
+                            "blocked"
+                        ],
+                        "type": "string"
+                    },
+                    "token": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
             "handlers.CRMClientResponse": {
                 "properties": {
                     "birthday": {
                         "description": "YYYY-MM-DD",
-                        "type": "string"
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     },
                     "clinic": {
                         "type": "string"
@@ -30,7 +126,19 @@
             },
             "handlers.CreateRequest": {
                 "properties": {
+                    "assessment_token": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "confirmed": {
+                        "type": "boolean"
+                    },
                     "crm_id": {
+                        "type": "string"
+                    },
+                    "reason": {
                         "type": "string"
                     },
                     "site_id": {
@@ -79,7 +187,10 @@
                 "properties": {
                     "birthday": {
                         "description": "YYYY-MM-DD",
-                        "type": "string"
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     },
                     "id": {
                         "type": "string"
@@ -95,15 +206,16 @@
             }
         }
     },
+    "externalDocs": {
+        "description": "Исходный код и инструкции по запуску проекта.",
+        "url": "https://github.com/437i/client-matcher"
+    },
     "info": {
         "description": "REST API для ручного сопоставления ID клиента в CRM и ID клиента на сайте.",
         "title": "Client Matcher API",
         "version": "1.0.0"
     },
-    "externalDocs": {
-        "description": "Исходный код и инструкции по запуску проекта.",
-        "url": "https://github.com/437i/client-matcher"
-    },
+    "openapi": "3.1.0",
     "paths": {
         "/api/v1/crm-clients": {
             "get": {
@@ -181,6 +293,100 @@
                 ]
             }
         },
+        "/api/v1/link-assessments": {
+            "post": {
+                "description": "Возвращает ready, requires_confirmation или blocked. Токен действует пять минут. При blocked проверки пусты, токен и срок действия равны null.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/handlers.AssessmentRequest",
+                                "description": "Идентификаторы пары",
+                                "summary": "request"
+                            }
+                        }
+                    },
+                    "description": "Идентификаторы пары",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.AssessmentResponse"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Request Entity Too Large"
+                    },
+                    "499": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Запрос отменён клиентом"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Bad Gateway"
+                    },
+                    "504": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Gateway Timeout"
+                    }
+                },
+                "summary": "Оценить пару CRM и сайта",
+                "tags": [
+                    "links"
+                ]
+            }
+        },
         "/api/v1/links": {
             "get": {
                 "description": "Возвращает все сохранённые связи между клиентами CRM и сайта.",
@@ -235,14 +441,14 @@
                 ]
             },
             "post": {
-                "description": "Создаёт связь между клиентом CRM и клиентом сайта после проверки совпадения фамилии и даты рождения.",
+                "description": "Повторно получает обе записи. Для ready достаточно двух ID. Для requires_confirmation передайте актуальный assessment_token, confirmed=true и причину длиной 1–1000 символов после обрезки пробелов. Не указывайте ФИО и даты рождения в причине.",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/handlers.CreateRequest",
-                                "summary": "request",
-                                "description": "Пара идентификаторов"
+                                "description": "Пара идентификаторов",
+                                "summary": "request"
                             }
                         }
                     },
@@ -289,6 +495,16 @@
                             }
                         },
                         "description": "Conflict"
+                    },
+                    "413": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Тело запроса превышает 16 КиБ"
                     },
                     "422": {
                         "content": {
@@ -519,7 +735,12 @@
             }
         }
     },
-    "openapi": "3.1.0",
+    "servers": [
+        {
+            "description": "Текущий хост, на котором запущен backend.",
+            "url": "/"
+        }
+    ],
     "tags": [
         {
             "description": "Поиск клиентов в CRM.",
@@ -536,12 +757,6 @@
         {
             "description": "Служебные endpoints.",
             "name": "system"
-        }
-    ],
-    "servers": [
-        {
-            "description": "Текущий хост, на котором запущен backend.",
-            "url": "/"
         }
     ]
 }

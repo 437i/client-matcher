@@ -3,6 +3,8 @@ package http_test
 import (
 	"context"
 	"errors"
+	tokenOutbound "github.com/437i/client-matcher/backend/internal/adapters/outbound"
+	"github.com/437i/client-matcher/backend/internal/application/ports"
 	"net/http"
 	"sort"
 	"strconv"
@@ -65,11 +67,12 @@ func (s *stubSite) GetByID(context.Context, string) (client.SiteClient, error) {
 }
 
 type stubLink struct {
-	createErr error
-	listErr   error
+	crmBusy, siteBusy bool
+	createErr         error
+	listErr           error
 }
 
-func (s *stubLink) Create(context.Context, link.ClientLink) (link.ClientLink, error) {
+func (s *stubLink) Create(context.Context, link.Decision) (link.ClientLink, error) {
 	if s.createErr != nil {
 		return link.ClientLink{}, s.createErr
 	}
@@ -84,15 +87,15 @@ func (s *stubLink) List(context.Context) ([]link.ClientLink, error) {
 }
 
 var (
-	validCRM = client.CRMClient{
+	validCRM = client.CRMClient{FirstName: "Иван",
 		ID:       "1",
 		LastName: "Иванов",
-		Birthday: client.Date{Year: 1990, Month: 1, Day: 1},
+		Birthday: &client.Date{Year: 1990, Month: 1, Day: 1},
 	}
-	validSite = client.SiteClient{
+	validSite = client.SiteClient{ShortName: "Иван",
 		ID:       "1",
 		LastName: "Иванов",
-		Birthday: client.Date{Year: 1990, Month: 1, Day: 1},
+		Birthday: &client.Date{Year: 1990, Month: 1, Day: 1},
 	}
 )
 
@@ -215,16 +218,16 @@ func parityScenarios() []parityScenario {
 			setup: func(_ *stubCRM, site *stubSite, _ *stubLink) {
 				site.found = client.SiteClient{
 					ID: "1", LastName: "Петров",
-					Birthday: client.Date{Year: 1990, Month: 1, Day: 1},
+					Birthday: &client.Date{Year: 1990, Month: 1, Day: 1},
 				}
 			},
 		},
 		{
 			name: "связь: пустая фамилия", specKey: "POST /api/v1/links",
 			method: http.MethodPost, path: "/api/v1/links", body: `{"crm_id":"1","site_id":"1"}`,
-			want: http.StatusBadGateway,
+			want: 422,
 			setup: func(_ *stubCRM, site *stubSite, _ *stubLink) {
-				site.found = client.SiteClient{ID: "1", Birthday: client.Date{Year: 1990, Month: 1, Day: 1}}
+				site.found = client.SiteClient{ID: "1", Birthday: &client.Date{Year: 1990, Month: 1, Day: 1}}
 			},
 		},
 		{
@@ -232,7 +235,7 @@ func parityScenarios() []parityScenario {
 			method: http.MethodPost, path: "/api/v1/links", body: `{"crm_id":"1","site_id":"1"}`,
 			want: http.StatusBadGateway,
 			setup: func(crm *stubCRM, _ *stubSite, _ *stubLink) {
-				crm.found = client.CRMClient{ID: "1", LastName: "Иванов"}
+				crm.found.Birthday = &client.Date{}
 			},
 		},
 		{
@@ -333,7 +336,7 @@ func parityScenarios() []parityScenario {
 }
 
 func TestSpecDocumentsHandlerStatuses(t *testing.T) {
-	scenarios := parityScenarios()
+	scenarios := append(parityScenarios(), assessmentParityScenarios()...)
 
 	observed := map[string]map[string]bool{}
 	for _, sc := range scenarios {
@@ -429,9 +432,16 @@ func documentedStatuses(t *testing.T) map[string]map[string]bool {
 func newParityServer(t *testing.T, crm *stubCRM, site *stubSite, links *stubLink, healthErr error) *gin.Engine {
 	t.Helper()
 
+	return newParityServerWithClock(t, crm, site, links, healthErr, ports.SystemClock{})
+}
+
+func newParityServerWithClock(t *testing.T, crm *stubCRM, site *stubSite, links *stubLink, healthErr error, clock ports.Clock) *gin.Engine {
+	t.Helper()
+	svc := services.NewClientLinkService(crm, site, links, tokenOutbound.NewHMACToken([32]byte{1}, clock), clock)
 	srv, err := web.NewRouter(
 		handlers.NewClientHandler(services.NewClientSearchService(crm, site)),
-		handlers.NewLinkHandler(services.NewClientLinkService(crm, site, links)),
+		handlers.NewLinkHandler(svc),
+		handlers.NewAssessmentHandler(svc),
 		handlers.NewHealthHandler(func(context.Context) error { return healthErr }),
 	)
 	if err != nil {
@@ -482,4 +492,24 @@ func schemaRefOf(resp *openapi3.Response) string {
 
 func isErrorStatus(status string) bool {
 	return strings.HasPrefix(status, "4") || strings.HasPrefix(status, "5")
+}
+
+func (s *stubLink) LookupBySourceIDs(context.Context, string, string) (bool, bool, error) {
+	return s.crmBusy, s.siteBusy, nil
+}
+
+func TestNullableResponseSchemas(t *testing.T) {
+	doc := loadOpenAPIDoc(t)
+	for schema, fields := range map[string][]string{
+		"handlers.CRMClientResponse":       {"birthday"},
+		"handlers.SiteClientResponse":      {"birthday"},
+		"handlers.AssessmentResponse":      {"token", "expires_at"},
+		"handlers.AssessmentCheckResponse": {"crm_value", "site_value"},
+	} {
+		for _, field := range fields {
+			if !doc.Components.Schemas[schema].Value.Properties[field].Value.Type.IncludesNull() {
+				t.Errorf("%s.%s must allow null", schema, field)
+			}
+		}
+	}
 }

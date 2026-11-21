@@ -18,7 +18,7 @@ var ErrInvalidDate = errors.New("invalid calendar date")
 // ParseDate разбирает дату в формате YYYY-MM-DD.
 func ParseDate(value string) (Date, error) {
 	parsed, err := time.Parse(time.DateOnly, strings.TrimSpace(value))
-	if err != nil {
+	if err != nil || parsed.Year() == 0 {
 		return Date{}, ErrInvalidDate
 	}
 	return Date{
@@ -58,4 +58,23 @@ func (d Date) IsValid() bool {
 	return parsed.Year() == d.Year &&
 		int(parsed.Month()) == d.Month &&
 		parsed.Day() == d.Day
+}
+
+func ParseOptionalDate(value string) (*Date, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	date, err := ParseDate(value)
+	if err != nil {
+		return nil, err
+	}
+	return &date, nil
+}
+
+func CloneDate(date *Date) *Date {
+	if date == nil {
+		return nil
+	}
+	copy := *date
+	return &copy
 }

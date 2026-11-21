@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
@@ -45,11 +46,21 @@ func NewPGLinkRepo(pool *pgxpool.Pool) *PGLinkRepo {
 	}
 }
 
-func (r *PGLinkRepo) Create(ctx context.Context, data link.ClientLink) (link.ClientLink, error) {
+func (r *PGLinkRepo) Create(ctx context.Context, data link.Decision) (link.ClientLink, error) {
+	var reason *string
+	var confirmedAt *time.Time
+	var ruleVersion *int
+	codes := []string{}
+	if data.Confirmation != nil {
+		reason = &data.Confirmation.Reason
+		confirmedAt = &data.Confirmation.At
+		codes = data.Confirmation.Codes
+		ruleVersion = &data.RuleVersion
+	}
 	sql, args, err := r.queryBuilder.
 		Insert(table).
-		Columns(crmIDCol, siteIDCol).
-		Values(data.CRMID, data.SiteID).
+		Columns(crmIDCol, siteIDCol, "manually_confirmed", "confirmation_reason", "confirmation_codes", "confirmed_at", "assessment_rule_version").
+		Values(data.CRMID, data.SiteID, data.Confirmation != nil, reason, codes, confirmedAt, ruleVersion).
 		Suffix("RETURNING " + strings.Join(linkColumns, ", ")).
 		ToSql()
 	if err != nil {
@@ -109,4 +120,10 @@ func (r *PGLinkRepo) List(ctx context.Context) ([]link.ClientLink, error) {
 	}
 
 	return results, nil
+}
+
+func (r *PGLinkRepo) LookupBySourceIDs(ctx context.Context, crmID, siteID string) (bool, bool, error) {
+	var crm, site bool
+	err := r.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM client_links WHERE crm_id=$1), EXISTS (SELECT 1 FROM client_links WHERE site_id=$2)", crmID, siteID).Scan(&crm, &site)
+	return crm, site, err
 }

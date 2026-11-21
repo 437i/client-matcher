@@ -8,10 +8,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/437i/client-matcher/backend/internal/application/ports"
 	"github.com/437i/client-matcher/backend/internal/application/services"
 	"github.com/437i/client-matcher/backend/internal/domain/client"
 	"github.com/437i/client-matcher/backend/internal/domain/link"
-	"github.com/437i/client-matcher/backend/internal/domain/matcher"
 )
 
 // ErrorResponse — единый формат ошибки. Code стабилен и предназначен для
@@ -34,21 +34,28 @@ func mapError(err error) apiError {
 	switch {
 	case errors.Is(err, services.ErrQueryEmpty):
 		return apiError{http.StatusBadRequest, "query_empty", "Введите имя клиента"}
+	case errors.Is(err, services.ErrInvalidID):
+		return apiError{400, "invalid_id", "Укажите оба ID"}
+	case errors.Is(err, ports.ErrAssessmentExpired):
+		return apiError{409, "assessment_expired", "Срок проверки истёк. Повторите проверку пары"}
+	case errors.Is(err, services.ErrAssessmentStale):
+		return apiError{409, "assessment_stale", "Данные изменились. Повторите проверку пары"}
 	case errors.Is(err, services.ErrIDEmpty):
 		return apiError{http.StatusBadRequest, "id_empty", "ID не может быть пустым"}
+	case errors.Is(err, services.ErrConfirmationRequired):
+		return apiError{http.StatusUnprocessableEntity, "confirmation_required", "Подтвердите расхождения и укажите причину"}
+	case errors.Is(err, services.ErrInvalidConfirmation):
+		return apiError{http.StatusBadRequest, "invalid_confirmation", "Проверьте подтверждение и причину (от 1 до 1000 символов)"}
+	case errors.Is(err, ports.ErrInvalidAssessmentToken):
+		return apiError{http.StatusBadRequest, "invalid_assessment_token", "Проверка пары устарела. Повторите проверку"}
+	case errors.Is(err, client.ErrInvalidSourceData):
+		return apiError{http.StatusBadGateway, "invalid_source_client_data", "Источник вернул некорректные данные клиента"}
 	case errors.Is(err, client.ErrCRMNotFound):
 		return apiError{http.StatusNotFound, "crm_client_not_found", "Клиент не найден в CRM"}
 	case errors.Is(err, client.ErrSiteNotFound):
 		return apiError{http.StatusNotFound, "site_client_not_found", "Клиент с таким ID не найден на сайте"}
 	case errors.Is(err, link.ErrNotFound):
 		return apiError{http.StatusNotFound, "link_not_found", "Связь не найдена"}
-	case errors.Is(err, matcher.ErrLastNameMismatch):
-		return apiError{http.StatusUnprocessableEntity, "last_name_mismatch", "Фамилии в CRM и на сайте не совпадают"}
-	case errors.Is(err, matcher.ErrBirthdayMismatch):
-		return apiError{http.StatusUnprocessableEntity, "birthday_mismatch", "Даты рождения в CRM и на сайте не совпадают"}
-	case errors.Is(err, matcher.ErrEmptyLastName),
-		errors.Is(err, matcher.ErrInvalidBirthday):
-		return apiError{http.StatusBadGateway, "invalid_source_client_data", "Источник вернул некорректные данные клиента"}
 	case errors.Is(err, link.ErrCRMAlreadyLinked):
 		return apiError{http.StatusConflict, "crm_already_linked", "Этот клиент CRM уже связан с ID сайта"}
 	case errors.Is(err, link.ErrSiteAlreadyLinked):
@@ -62,13 +69,12 @@ func mapError(err error) apiError {
 	}
 }
 
-// respondError отвечает клиенту безопасным сообщением, а настоящую причину
-// внутренних ошибок пишет в лог (раньше она терялась).
+// В журнал попадает код ошибки без данных источников и запроса.
 func respondError(c *gin.Context, err error) {
 	apiErr := mapError(err)
 	if apiErr.status >= http.StatusInternalServerError {
 		slog.ErrorContext(c.Request.Context(), "request failed",
-			"method", c.Request.Method, "path", c.FullPath(), "error", err)
+			"method", c.Request.Method, "path", c.FullPath(), "code", apiErr.code)
 	}
 	c.JSON(apiErr.status, ErrorResponse{Code: apiErr.code, Message: apiErr.message})
 }
