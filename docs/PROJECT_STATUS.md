@@ -4,7 +4,7 @@
 
 ## Git
 
-Ветка feat/crm-name-search. Опубликованный tracking ref `origin/feat/crm-name-search` перед текущими изменениями и локальный HEAD имеют SHA `352a02df1e8871e0bfc191b2a429778311be5946` (проверено без fetch).
+Ветка feat/crm-name-search. На момент preflight Stage 2 Explore локальный HEAD и локальный tracking ref `origin/feat/crm-name-search` совпадали на SHA `230082a57f9fec5d835fcb875ddc5b252c36ce77`. Проверка выполнена без fetch. До документальных правок рабочее дерево было чистым.
 Дополнительная проверка Stage 0: для site ID `1326` («Азамат Далгатов») на полном синтетическом CRM fixture подтверждено отсутствие кандидатов — `CRMRepo.Search` возвращает `[]`. Сценарий добавлен в `TestStage0FullDataset`. Производственный код не изменялся. Проверки `go test -count=1 -run '^TestStage0FullDataset$' -v ./internal/adapters/outbound/crm/csv`, `go test -count=1 ./...` и `git diff --check` завершились успешно.
 
 ## Этапы и фаза
@@ -33,7 +33,7 @@ Stage 0 завершён по критериям roadmap после полног
 ## Gate и следующий шаг
 
 Stage 0 gate закрыт. Stage 1 change: openspec/changes/matching-assessment-link-confirmation, proposal/specs/design/tasks созданы, strict validation 6/6. Первый Plan Review выявил четыре Medium; исправлены в планах, финальный review подтвердил отсутствие Critical/High/Medium.
-Stage 1 gate закрыт. Change остаётся активным в OpenSpec. Stage 2–7 не начаты.
+Stage 1 gate закрыт. Выполнены OpenSpec Sync и Archive. Архивированный change находится в `openspec/changes/archive/2026-11-21-matching-assessment-link-confirmation/`. Stage 2 начат с Explore для Site PostgreSQL Adapter. Apply не выполнялся, реализация адаптера не начата.
 
 ## Итоговые review gates
 
@@ -41,4 +41,8 @@ Stage 0: docs/stage0-code-review.md — READY WITH NOTES, без Critical/High/M
 
 Stage 1: docs/stage1-plan-review.md — финальная узкая проверка подтвердила закрытие M1–M4 и MD1, блокирующих Critical/High/Medium нет. Первичные отчёты сохранены отдельно как история. Все процессы review завершились exit 0; stream-json показывает модель claude-sonnet-5-5 и только Read/Grep/Glob. Reviewer не запускал тесты: результаты команд выполнены Codex.
 
-Stage 1 Code Review завершён с вердиктом READY после исправления Medium по версии правил в аудите ready-связей. Подробности проверок и ревью приведены в [отчёте Stage 1](stage1-code-review.md). Тесты покрывают приоритет invalid CRM при отсутствующем Site и обе неизвестные роли имени при UnstructuredName. Multi-instance, авторизация и готовность к production остаются вне текущего scope.
+Stage 1 Code Review завершён с вердиктом READY после исправления Medium по версии правил в аудите ready-связей. Затем выполнены Sync и Archive, результат сохранён в архивном каталоге выше. Подробности проверок и ревью приведены в [отчёте Stage 1](stage1-code-review.md). Тесты покрывают приоритет invalid CRM при отсутствующем Site и обе неизвестные роли имени при UnstructuredName. Multi-instance, авторизация и готовность к production остаются вне текущего scope.
+
+## Stage 2 Explore
+
+Исследован будущий Site PostgreSQL Adapter на основе текущего `SiteReader`, CSV-адаптера, доменной модели, конфигурации и предоставленной схемы `public.children`. Подтверждено, что порт можно сохранить без изменения application/domain слоёв, а CSV-режим должен остаться доступным через отдельный wiring. Для Propose требуют решения соответствие Site ID (`children.id` или `id_child_fond`), семантика `birthday timestamp without time zone`, политика NULL/некорректных значений и фильтры `published`, `type`, `old`, `transfered`, `death_date`. Тесты должны использовать только синтетическую временную PostgreSQL. OpenSpec change и planning artifacts для Stage 2 пока не создавались.
