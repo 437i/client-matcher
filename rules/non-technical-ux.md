@@ -39,7 +39,7 @@ Do not claim that real users tested the interface unless actual sessions with su
 
 ## Safe and predictable workflow
 
-- CRM search is an explicit, understandable action. Enter submits the search; the user can also press a clearly labelled button. Do not send a request on every keystroke without a deliberate, tested reason.
+- For Stage 5, CRM search starts automatically after about 300 ms of pause once the query reaches the minimum length. Do not send a request for every keystroke. Enter and the clearly labelled button can start the search immediately.
 - Search results must be easy to distinguish. Show full name prominently, then date of birth and organization. Keep the record ID visible but secondary. Never select a candidate automatically.
 - Make the selected CRM record unmistakable and provide a simple “Изменить выбор” action.
 - Site lookup requires an explicit click or Enter. Show the returned record before saving.

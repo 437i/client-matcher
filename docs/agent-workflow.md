@@ -32,7 +32,7 @@ Preflight → Explore → Propose → Plan Review → User Approval → Apply �
 
 Пользователь подтвердил интерактивную работу точного model ID claude-sonnet-5-5, effort medium. Headless smoke test из Codex также прошёл 2026-11-20; подробности в agent-infrastructure-verification.md. Это основной reviewer архитектуры, matching, API, БД и безопасности.
 
-Codex самостоятельно запускает из корня проекта: claude --print --model claude-sonnet-5-5 --effort medium --permission-mode plan --tools "Read,Grep,Glob" --disallowedTools "Bash,PowerShell,Edit,Write,NotebookEdit,Agent" --strict-mcp-config --mcp-config '{"mcpServers":{}}' --settings '{"disableAllHooks":true,"useAutoModeDuringPlan":false}' --permission-prompts none --max-turns 20 'ЗАДАНИЕ REVIEW С ТОЧНЫМ SCOPE'.
+Проверенная команда запускается из корня проекта: `claude --print --model claude-sonnet-5-5 --effort medium --permission-mode plan --tools "Read,Grep,Glob" --disallowedTools "Bash,PowerShell,Edit,Write,NotebookEdit,Agent" --strict-mcp-config --mcp-config '{"mcpServers":{}}' --settings '{"disableAllHooks":true,"useAutoModeDuringPlan":false}' --permission-prompts none --max-turns 20 --output-format stream-json --verbose 'ЗАДАНИЕ REVIEW С ТОЧНЫМ SCOPE'`. Claude Code 2.1.329, fallback model не используется. Все перечисленные параметры явно передаются через argv и не наследуются из пользовательской конфигурации.
 
 При запуске длительного headless review через Code Mode весь JavaScript source, передаваемый во внешний `functions.exec`, должен начинаться с директивы:
 
@@ -40,11 +40,11 @@ Codex самостоятельно запускает из корня проек
 // @exec: {"yield_time_ms": 650000, "max_output_tokens": 3000}
 ```
 
-Директива относится к внешнему `functions.exec`, а не к Python-коду и не к вложенному `exec_command`. Внутри этого же JavaScript-вызова запускается существующий Python-скрипт через `tools.exec_command`. Если первоначальный вызов возвращает `session_id`, потому что процесс ещё выполняется, этот JavaScript самостоятельно ожидает завершения через `tools.write_stdin` с пустым `chars` и `yield_time_ms: 30000`. Ожидание продолжается циклом внутри одного JavaScript execution до появления `exit_code`. Все части вывода собираются и передаются модели только после завершения. Если процесс завершился в первоначальном `exec_command`, дополнительный `write_stdin` не нужен.
+Директива относится к внешнему Code Mode execution и задаёт `yield_time_ms`, а Python wrapper отдельно задаёт timeout `p.wait()`. Для основного review подтверждён wrapper timeout 1190 секунд и внешний `yield_time_ms=1300000`. JavaScript в одном Code Mode execution запускает Python через `exec_command`, затем самостоятельно ждёт terminal session через `write_stdin` каждые 30 секунд до `exit_code`. Claude session ID и terminal session ID внешнего `exec_command` являются разными идентификаторами.
 
-Нельзя возвращать управление модели для проверки PID, `tail`, `ps`, `lsof` или повторного опроса того же процесса. Итоговый `exit_code` передаётся полностью, включая ненулевые коды и таймаут Python. Таймаут или ошибку нельзя выдавать за успешный review.
+Нельзя возвращать управление модели для проверки PID, `tail`, `ps`, `lsof` или повторного опроса того же процесса. При timeout wrapper отправляет SIGTERM, затем SIGKILL. Таймаут не является verdict. Отсутствие события `result` означает, что review не завершён успешно, даже если wrapper завершился без shell-ошибки.
 
-Plan Review получает proposal, specs, design, tasks и необходимые инструкции проекта. Проверяет полноту требований, доменную модель, архитектуру, ограничения, риски и критерии готовности.
+Plan Review получает только change artifacts, инструкции проекта и действительно релевантные исходники. Не следует читать весь репозиторий, frontend, fixtures и не относящиеся к задаче файлы без причины. Узкий follow-up может использовать `--max-turns 4` только при явно ограниченном scope. Проверяются полнота требований, доменная модель, архитектура, ограничения, риски и критерии готовности.
 
 Code Review получает точный список изменённых файлов, включая untracked, соответствующий OpenSpec change, фактический diff и результаты команд. Если change отсутствует для локальной корректировки, явно указать это. Не передавать несвязанный пользовательский diff.
 
