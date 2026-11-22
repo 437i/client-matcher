@@ -34,6 +34,16 @@ Preflight → Explore → Propose → Plan Review → User Approval → Apply �
 
 Codex самостоятельно запускает из корня проекта: claude --print --model claude-sonnet-5-5 --effort medium --permission-mode plan --tools "Read,Grep,Glob" --disallowedTools "Bash,PowerShell,Edit,Write,NotebookEdit,Agent" --strict-mcp-config --mcp-config '{"mcpServers":{}}' --settings '{"disableAllHooks":true,"useAutoModeDuringPlan":false}' --permission-prompts none --max-turns 20 'ЗАДАНИЕ REVIEW С ТОЧНЫМ SCOPE'.
 
+При запуске длительного headless review через Code Mode весь JavaScript source, передаваемый во внешний `functions.exec`, должен начинаться с директивы:
+
+```javascript
+// @exec: {"yield_time_ms": 650000, "max_output_tokens": 3000}
+```
+
+Директива относится к внешнему `functions.exec`, а не к Python-коду и не к вложенному `exec_command`. Внутри этого же JavaScript-вызова запускается существующий Python-скрипт через `tools.exec_command`. Если первоначальный вызов возвращает `session_id`, потому что процесс ещё выполняется, этот JavaScript самостоятельно ожидает завершения через `tools.write_stdin` с пустым `chars` и `yield_time_ms: 30000`. Ожидание продолжается циклом внутри одного JavaScript execution до появления `exit_code`. Все части вывода собираются и передаются модели только после завершения. Если процесс завершился в первоначальном `exec_command`, дополнительный `write_stdin` не нужен.
+
+Нельзя возвращать управление модели для проверки PID, `tail`, `ps`, `lsof` или повторного опроса того же процесса. Итоговый `exit_code` передаётся полностью, включая ненулевые коды и таймаут Python. Таймаут или ошибку нельзя выдавать за успешный review.
+
 Plan Review получает proposal, specs, design, tasks и необходимые инструкции проекта. Проверяет полноту требований, доменную модель, архитектуру, ограничения, риски и критерии готовности.
 
 Code Review получает точный список изменённых файлов, включая untracked, соответствующий OpenSpec change, фактический diff и результаты команд. Если change отсутствует для локальной корректировки, явно указать это. Не передавать несвязанный пользовательский diff.

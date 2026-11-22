@@ -1,10 +1,10 @@
 # Фактическое состояние Client Matcher
 
-Дата проверки: 2026-11-21. Долгосрочный план: [roadmap.md](roadmap.md).
+Дата проверки: 2026-11-22. Долгосрочный план: [roadmap.md](roadmap.md).
 
 ## Git
 
-Ветка feat/crm-name-search. На момент preflight Stage 2 Explore локальный HEAD и локальный tracking ref `origin/feat/crm-name-search` совпадали на SHA `230082a57f9fec5d835fcb875ddc5b252c36ce77`. Проверка выполнена без fetch. До документальных правок рабочее дерево было чистым.
+На preflight Stage 2 Propose ветка `feat/crm-name-search` и локальный tracking ref `origin/feat/crm-name-search` совпали на `cab2621fa1f81bbd316f69fbdec02686818a059c` без fetch. Исходное рабочее дерево было чистым.
 Дополнительная проверка Stage 0: для site ID `1326` («Азамат Далгатов») на полном синтетическом CRM fixture подтверждено отсутствие кандидатов — `CRMRepo.Search` возвращает `[]`. Сценарий добавлен в `TestStage0FullDataset`. Производственный код не изменялся. Проверки `go test -count=1 -run '^TestStage0FullDataset$' -v ./internal/adapters/outbound/crm/csv`, `go test -count=1 ./...` и `git diff --check` завершились успешно.
 
 ## Этапы и фаза
@@ -24,8 +24,6 @@ Stage 0 завершён по критериям roadmap после полног
 ## Неподтверждённое и открытые вопросы
 
 - Stage 0 Code Review завершён; отчёт docs/stage0-code-review.md. Low-1 закрыт добавлением и проверкой no-match сценария site ID 1326, «Азамат Далгатов», с фактической выдачей `[]`. Ожидания site→CRM заданы для 14 именованных регрессий из 55 site-запросов; остальные проверены на загрузку, стабильность и лимит. Полный CRM набор проверен на находимость исходных записей и уникальность ID в выдаче.
-- Site ID соответствует children.id или id_child_fond — не подтверждено; текущие string/TEXT сохраняются до отдельного решения.
-- Семантика timestamp birthday как UTC и фильтры published/type/old/transfered/death_date не подтверждены.
 - Структура Bitrix, права локального CRM индекса, способы авторизации неизвестны.
 - Дополнительные заметки в конце roadmap (родители, согласия, карточки, ручное добавление) требуют уточнения и распределения по этапам; не включать автоматически в Stage 1.
 - Авторизация и production-readiness отсутствуют; реальные источники не подключать.
@@ -33,7 +31,7 @@ Stage 0 завершён по критериям roadmap после полног
 ## Gate и следующий шаг
 
 Stage 0 gate закрыт. Stage 1 change: openspec/changes/matching-assessment-link-confirmation, proposal/specs/design/tasks созданы, strict validation 6/6. Первый Plan Review выявил четыре Medium; исправлены в планах, финальный review подтвердил отсутствие Critical/High/Medium.
-Stage 1 gate закрыт. Выполнены OpenSpec Sync и Archive. Архивированный change находится в `openspec/changes/archive/2026-11-21-matching-assessment-link-confirmation/`. Stage 2 начат с Explore для Site PostgreSQL Adapter. Apply не выполнялся, реализация адаптера не начата.
+Stage 1 gate закрыт. Выполнены OpenSpec Sync и Archive. Архивированный change находится в `openspec/changes/archive/2026-11-21-matching-assessment-link-confirmation/`. Stage 2 перешёл от Explore к Propose. Apply требует прохождения Plan Review и отдельного разрешения пользователя.
 
 ## Итоговые review gates
 
@@ -43,6 +41,12 @@ Stage 1: docs/stage1-plan-review.md — финальная узкая прове
 
 Stage 1 Code Review завершён с вердиктом READY после исправления Medium по версии правил в аудите ready-связей. Затем выполнены Sync и Archive, результат сохранён в архивном каталоге выше. Подробности проверок и ревью приведены в [отчёте Stage 1](stage1-code-review.md). Тесты покрывают приоритет invalid CRM при отсутствующем Site и обе неизвестные роли имени при UnstructuredName. Multi-instance, авторизация и готовность к production остаются вне текущего scope.
 
-## Stage 2 Explore
+## Stage 2 Propose
 
-Исследован будущий Site PostgreSQL Adapter на основе текущего `SiteReader`, CSV-адаптера, доменной модели, конфигурации и предоставленной схемы `public.children`. Подтверждено, что порт можно сохранить без изменения application/domain слоёв, а CSV-режим должен остаться доступным через отдельный wiring. Для Propose требуют решения соответствие Site ID (`children.id` или `id_child_fond`), семантика `birthday timestamp without time zone`, политика NULL/некорректных значений и фильтры `published`, `type`, `old`, `transfered`, `death_date`. Тесты должны использовать только синтетическую временную PostgreSQL. OpenSpec change и planning artifacts для Stage 2 пока не создавались.
+Change [site-postgresql-adapter](../openspec/changes/site-postgresql-adapter/proposal.md) содержит proposal, design, три delta specs и tasks. OpenSpec strict validation прошла. Финальный Claude Plan Review выполнен через один Code Mode execution с ожиданием `session_id` внутри того же JavaScript-вызова. Использована модель claude-sonnet-5-5, effort medium, Read/Grep/Glob, исходные permission mode, MCP и hooks без изменений. После двух диагностических запусков без verdict (595 секунд и 1190 секунд, соответственно 49 и 57 tool calls) scope prompt был сужен до planning artifacts и релевантного backend. Финальный запуск завершился за 276.32 секунды, `exit_code=0`, `is_error=false`, `num_turns=26`, 25 tool calls и событие `result`. Claude выдал `READY WITH NOTES` и маркер `STAGE2_PLAN_REVIEW_DONE`. Он указал один High и два Medium по полноте задач. Все три уточнения внесены в `tasks.md`: явный `client.ErrInvalidSourceData`, точная сигнатура `Verify(... siteID int64)`, `strconv.FormatInt` для fingerprint и двухфазная валидация `config.Load()`. После исправлений выполнен узкий follow-up review только по `tasks.md` и `design.md`: 75.89 секунды, `exit_code=0`, 2 tool calls, без Critical/High/Medium, с verdict `READY WITH NOTES` и маркером `STAGE2_PLAN_REVIEW_FOLLOWUP_DONE`. Отмечены только Low-заметки для Apply: явно сопоставить infinity/вне диапазона с `ErrInvalidSourceData` и уточнить, что `SITE_SOURCE` имеет default `csv`. После исправлений strict validation и `git diff --check` проходят. Plan Review gate закрыт, Apply требует отдельного разрешения пользователя.
+
+- Site ID — `public.children.id` (`bigserial`). Внутренний тип переводится на `int64`, хранилище связей на `BIGINT` новой Goose-миграцией, HTTP сохраняет строки.
+- `birthday` преобразуется как `((birthday AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date`. NULL соответствует `nil`. Некорректная дата возвращает ошибку чтения источника.
+- Чтение по ключу без дополнительных фильтров. CSV-демонстрация сохраняется. PostgreSQL сайта получает отдельную конфигурацию и пул. Интеграционные проверки используют временные синтетические БД.
+
+Для следующих этапов согласованы debounce CRM-поиска около 300 мс и ограничение доступа инфраструктурой сервера. Внутренние учётные записи и роли исключены из плана. Защита HTTP-доступа подлежит проверке перед эксплуатацией с реальными данными.
