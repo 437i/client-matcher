@@ -34,13 +34,19 @@ Preflight → Explore → Propose → Plan Review → User Approval → Apply �
 
 Проверенная команда запускается из корня проекта: `claude --print --model claude-sonnet-5-5 --effort medium --permission-mode plan --tools "Read,Grep,Glob" --disallowedTools "Bash,PowerShell,Edit,Write,NotebookEdit,Agent" --strict-mcp-config --mcp-config '{"mcpServers":{}}' --settings '{"disableAllHooks":true,"useAutoModeDuringPlan":false}' --permission-prompts none --max-turns 20 --output-format stream-json --verbose 'ЗАДАНИЕ REVIEW С ТОЧНЫМ SCOPE'`. Claude Code 2.1.329, fallback model не используется. Все перечисленные параметры явно передаются через argv и не наследуются из пользовательской конфигурации.
 
-При запуске длительного headless review через Code Mode весь JavaScript source, передаваемый во внешний `functions.exec`, должен начинаться с директивы:
+При запуске headless review через Code Mode значения таймаутов зависят от уровня исполнения. `p.wait()` в Python wrapper и `yield_time_ms` во внешнем Code Mode execution являются независимыми таймаутами разных уровней исполнения. Для основного Plan Review используются Python wrapper `p.wait(timeout=1190)`, внешний Code Mode execution `yield_time_ms=1300000` и `--max-turns 20`:
+
+```javascript
+// @exec: {"yield_time_ms": 1300000, "max_output_tokens": 3000}
+```
+
+Узкий follow-up допускает только явно ограниченный scope и использует Python wrapper `p.wait(timeout=180)`, внешний Code Mode execution `yield_time_ms=650000` и `--max-turns 4`:
 
 ```javascript
 // @exec: {"yield_time_ms": 650000, "max_output_tokens": 3000}
 ```
 
-Директива относится к внешнему Code Mode execution и задаёт `yield_time_ms`, а Python wrapper отдельно задаёт timeout `p.wait()`. Для основного review подтверждён wrapper timeout 1190 секунд и внешний `yield_time_ms=1300000`. JavaScript в одном Code Mode execution запускает Python через `exec_command`, затем самостоятельно ждёт terminal session через `write_stdin` каждые 30 секунд до `exit_code`. Claude session ID и terminal session ID внешнего `exec_command` являются разными идентификаторами.
+Обе директивы относятся к внешнему Code Mode execution и задают его `yield_time_ms`. JavaScript в одном Code Mode execution запускает Python через `exec_command`, затем самостоятельно ждёт terminal session через `write_stdin` каждые 30 секунд до `exit_code`. Claude session ID и terminal session ID внешнего `exec_command` являются разными идентификаторами.
 
 Нельзя возвращать управление модели для проверки PID, `tail`, `ps`, `lsof` или повторного опроса того же процесса. При timeout wrapper отправляет SIGTERM, затем SIGKILL. Таймаут не является verdict. Отсутствие события `result` означает, что review не завершён успешно, даже если wrapper завершился без shell-ошибки.
 
