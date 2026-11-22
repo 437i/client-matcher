@@ -38,11 +38,6 @@ func (s *ClientSearchService) SearchClients(ctx context.Context, query string) (
 
 // GetSiteClient нужен интерфейсу, чтобы показать редактору, кому принадлежит
 // введённый им ID сайта, до сохранения связи.
-func (s *ClientSearchService) GetSiteClient(ctx context.Context, id string) (client.SiteClient, error) {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return client.SiteClient{}, ErrIDEmpty
-	}
-
+func (s *ClientSearchService) GetSiteClient(ctx context.Context, id int64) (client.SiteClient, error) {
 	return s.siteRepo.GetByID(ctx, id)
 }

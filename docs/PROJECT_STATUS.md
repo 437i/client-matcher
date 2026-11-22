@@ -55,3 +55,17 @@ Change [site-postgresql-adapter](../openspec/changes/site-postgresql-adapter/pro
 - Чтение по ключу без дополнительных фильтров. CSV-демонстрация сохраняется. PostgreSQL сайта получает отдельную конфигурацию и пул. Интеграционные проверки используют временные синтетические БД.
 
 Для следующих этапов согласован debounce CRM-поиска около 300 мс. Внутренние учётные записи и роли приложения исключены из плана. Ограничение доступа к production-развёртыванию с реальными данными обеспечивает ответственная команда деплоя. Публичное развёртывание без соответствующей инфраструктурной защиты небезопасно.
+
+
+## Stage 2 Apply / Verify
+
+Stage 2 Apply реализован в рабочем дереве без commit/push. Сквозной Site ID переведён на int64, HTTP сохранил строковый формат, токены используют версию 2, добавлены миграция TEXT→BIGINT, PostgreSQL SiteReader, выбор CSV/PostgreSQL и отдельный pool сайта.
+
+Проверки прошли: `go test -count=1 ./...`, `go test -race -count=1 ./...`, `go vet ./...`, `go build ./...`, `git diff --check`, `openspec validate --all --strict`. Интеграционные тесты SiteReader и link repository прошли на отдельных временных синтетических PostgreSQL БД. Сквозной запуск сервера прошёл для CSV и PostgreSQL, включая health, карточку, assessment, создание связи, отсутствие fallback и закрытие pool.
+
+Claude Code Review Stage 2 завершён через документированный Python wrapper и внешний Code Mode execution. Wrapper использовал p.wait(timeout=1190), внешний yield_time_ms=1300000, --max-turns 20, Read,Grep,Glob, пустой MCP config и read-only ограничения. Результат exit_code=0, is_error=false, одно событие result, 85 tool calls, verdict READY WITH NOTES, подтверждённых Critical/High/Medium нет. Low notes переданы как будущие улучшения. Stage 2 Apply/Verify/Code Review gate закрыты, Sync и Archive не выполнялись.
+
+
+### Claude Code Review connectivity note
+
+Claude Code в этом окружении использует кастомный провайдер ANTHROPIC_BASE_URL=https://api.wellflow.dev/v1, а не публичный Anthropic endpoint. Ошибка ENOTFOUND возникала при sandbox-запуске subprocess без сетевого доступа. Рабочий способ — запускать документированный Python wrapper через внешний Code Mode execution с сетевым разрешением, сохранять p.wait(timeout=1190) и ждать terminal session через write_stdin каждые 30 секунд до exit_code. Проверка api.wellflow.dev подтвердила DNS и HTTPS доступность без передачи credentials.

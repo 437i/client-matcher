@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/437i/client-matcher/backend/internal/application/ports"
@@ -57,7 +58,7 @@ func sourceBytes(crm client.CRMClient, site client.SiteClient) []byte {
 	field("crm.patronymic", crm.Patronymic)
 	field("crm.unstructured_name", crm.UnstructuredName)
 	date("crm.birthday", crm.Birthday)
-	field("site.id", site.ID)
+	field("site.id", strconv.FormatInt(site.ID, 10))
 	field("site.last_name", site.LastName)
 	field("site.first_name", site.ShortName)
 	field("site.unstructured_name", site.UnstructuredName)
@@ -85,7 +86,7 @@ func (h *HMACToken) Issue(ctx context.Context, claims ports.TokenClaims) (string
 	return token, nil
 }
 
-func (h *HMACToken) Verify(ctx context.Context, token, crmID, siteID string) (ports.TokenClaims, error) {
+func (h *HMACToken) Verify(ctx context.Context, token, crmID string, siteID int64) (ports.TokenClaims, error) {
 	if err := ctx.Err(); err != nil {
 		return ports.TokenClaims{}, err
 	}

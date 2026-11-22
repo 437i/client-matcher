@@ -8,6 +8,7 @@ import (
 	tokenOutbound "github.com/437i/client-matcher/backend/internal/adapters/outbound"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,6 +40,9 @@ const siteData = `id,title,birthday
 3588,Пётр Королев,2001-09-09
 3589,Ваня Петров,1982-04-15
 3590,Ваня Иванов,1983-01-01
+0,Иван Иванов,1982-04-15
+-9223372036854775808,Иван Иванов,1982-04-15
+9223372036854775807,Иван Иванов,1982-04-15
 `
 
 // memLinkRepo — in-memory реализация ports.ClientLinkRepo (вместо PostgreSQL).
@@ -217,13 +221,13 @@ func TestCreateLinkErrors(t *testing.T) {
 		wantCode   string
 	}{
 		{"crm not found", `{"crm_id":"0","site_id":"3586"}`, nil, 404, "crm_client_not_found"},
-		{"site not found", `{"crm_id":"1352","site_id":"0"}`, nil, 404, "site_client_not_found"},
+		{"site not found", `{"crm_id":"1352","site_id":"9999"}`, nil, 404, "site_client_not_found"},
 		{"last name mismatch", `{"crm_id":"1352","site_id":"3589"}`, nil, 422, "confirmation_required"},
 		{"birthday mismatch", `{"crm_id":"1352","site_id":"3590"}`, nil, 422, "confirmation_required"},
 		{"crm already linked", `{"crm_id":"1352","site_id":"3586"}`, link.ErrCRMAlreadyLinked, 409, "crm_already_linked"},
 		{"site already linked", `{"crm_id":"1352","site_id":"3586"}`, link.ErrSiteAlreadyLinked, 409, "site_already_linked"},
 		{"internal error is not leaked", `{"crm_id":"1352","site_id":"3586"}`, errors.New("pq: password=secret"), 500, "internal_error"},
-		{"missing field", `{"crm_id":"1352"}`, nil, 400, "invalid_id"},
+		{"missing field", `{"crm_id":"1352"}`, nil, 400, "invalid_body"},
 		{"blank id", `{"crm_id":"  ","site_id":"3586"}`, nil, 400, "invalid_id"},
 		{"broken json", `{`, nil, 400, "invalid_body"},
 	}
@@ -312,7 +316,7 @@ func TestHealth(t *testing.T) {
 	}
 }
 
-func (m *memLinkRepo) LookupBySourceIDs(_ context.Context, crmID, siteID string) (bool, bool, error) {
+func (m *memLinkRepo) LookupBySourceIDs(_ context.Context, crmID string, siteID int64) (bool, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var crm, site bool
@@ -321,4 +325,74 @@ func (m *memLinkRepo) LookupBySourceIDs(_ context.Context, crmID, siteID string)
 		site = site || record.SiteID == siteID
 	}
 	return crm, site, nil
+}
+
+func TestSiteIDHTTP(t *testing.T) {
+	for _, tc := range []struct{ input, canonical string }{
+		{" -0 ", "0"}, {"-9223372036854775808", "-9223372036854775808"},
+		{" +09223372036854775807 ", "9223372036854775807"},
+	} {
+		t.Run(tc.canonical, func(t *testing.T) {
+			srv := newTestServer(t, &memLinkRepo{})
+			rec := do(t, srv, http.MethodGet, "/api/v1/site-clients/"+url.PathEscape(tc.input), "")
+			var card handlers.SiteClientResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &card); err != nil || rec.Code != 200 || card.ID != tc.canonical {
+				t.Fatalf("card: %d %s", rec.Code, rec.Body)
+			}
+			pair, err := json.Marshal(handlers.AssessmentRequest{CRMID: "1352", SiteID: tc.input})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec = do(t, srv, http.MethodPost, assessmentPath, string(pair))
+			var assessment handlers.AssessmentResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &assessment); err != nil || rec.Code != 200 || assessment.Status != "ready" || assessment.Token == nil {
+				t.Fatalf("assessment: %d %s", rec.Code, rec.Body)
+			}
+			req, err := json.Marshal(handlers.CreateRequest{CRMID: "1352", SiteID: tc.canonical, AssessmentToken: assessment.Token})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec = do(t, srv, http.MethodPost, linksPath, string(req))
+			var saved handlers.LinkResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &saved); err != nil || rec.Code != 201 || saved.SiteID != tc.canonical {
+				t.Fatalf("create: %d %s", rec.Code, rec.Body)
+			}
+			rec = do(t, srv, http.MethodGet, linksPath, "")
+			var list []handlers.LinkResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || rec.Code != 200 || len(list) != 1 || list[0].SiteID != tc.canonical {
+				t.Fatalf("list: %d %s", rec.Code, rec.Body)
+			}
+			rec = do(t, srv, http.MethodGet, linksPath+"/export.csv", "")
+			if rec.Code != 200 || rec.Body.String() != "crm_id,site_id\n1352,"+tc.canonical+"\n" {
+				t.Fatalf("export: %d %s", rec.Code, rec.Body)
+			}
+		})
+	}
+}
+
+func TestInvalidSiteIDHTTP(t *testing.T) {
+	// Missing dependencies make an unintended call to a source fail the test.
+	srv := newParityServerWithClock(t, nil, nil, nil, nil, &assessmentClock{})
+	check := func(method, path, body, code string) {
+		t.Helper()
+		rec := do(t, srv, method, path, body)
+		if rec.Code != 400 || errCode(t, rec) != code {
+			t.Fatalf("%s %s: %d %s", method, path, rec.Code, rec.Body)
+		}
+	}
+	for _, raw := range []string{" ", "1.0", "1e2", "0x1", "1_2", "9223372036854775808", "-9223372036854775809"} {
+		check(http.MethodGet, "/api/v1/site-clients/"+url.PathEscape(raw), "", "invalid_id")
+		pair, err := json.Marshal(handlers.AssessmentRequest{CRMID: "1352", SiteID: raw})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range []string{assessmentPath, linksPath} {
+			check(http.MethodPost, path, string(pair), "invalid_id")
+		}
+	}
+	for _, path := range []string{assessmentPath, linksPath} {
+		for _, body := range []string{"{\"crm_id\":\"1352\"}", "{\"crm_id\":\"1352\",\"site_id\":1}", "{\"crm_id\":\"1352\",\"site_id\":null}"} {
+			check(http.MethodPost, path, body, "invalid_body")
+		}
+	}
 }

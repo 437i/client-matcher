@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 	"testing"
 
 	sitecsv "github.com/437i/client-matcher/backend/internal/adapters/outbound/site/csv"
@@ -88,7 +89,11 @@ func TestStage0FullDataset(t *testing.T) {
 		"1369": {"5636", "6145"}, "969": {"5751", "8963"},
 	}
 	for _, row := range rows[1:] {
-		c, err := site.GetByID(context.Background(), row[0])
+		id, err := strconv.ParseInt(row[0], 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := site.GetByID(context.Background(), id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +161,7 @@ func TestStage0FullDataset(t *testing.T) {
 		t.Fatalf("ordered search snapshot: %s", digest)
 	}
 	// The known date discrepancy must not remove the selected search candidate.
-	s, err := site.GetByID(context.Background(), "1066")
+	s, err := site.GetByID(context.Background(), 1066)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +18,8 @@ type SearchQuery struct {
 }
 
 type CreateRequest struct {
-	CRMID           string  `json:"crm_id" binding:"required"`
+	CRMID string `json:"crm_id" binding:"required"`
+	// SiteID — строка десятичного целого от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы.
 	SiteID          string  `json:"site_id" binding:"required"`
 	AssessmentToken *string `json:"assessment_token,omitempty" extensions:"x-nullable"`
 	Confirmed       *bool   `json:"confirmed,omitempty"`
@@ -25,7 +27,8 @@ type CreateRequest struct {
 }
 
 type AssessmentRequest struct {
-	CRMID  string `json:"crm_id" binding:"required"`
+	CRMID string `json:"crm_id" binding:"required"`
+	// SiteID — строка десятичного целого от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы.
 	SiteID string `json:"site_id" binding:"required"`
 }
 type AssessmentCheckResponse struct {
@@ -81,7 +84,7 @@ func newCRMClientResponse(c client.CRMClient) CRMClientResponse {
 
 func newSiteClientResponse(c client.SiteClient) SiteClientResponse {
 	return SiteClientResponse{
-		ID:        c.ID,
+		ID:        strconv.FormatInt(c.ID, 10),
 		ShortName: c.ShortName,
 		LastName:  c.LastName,
 		Birthday:  birthdayString(c.Birthday),
@@ -89,7 +92,7 @@ func newSiteClientResponse(c client.SiteClient) SiteClientResponse {
 }
 
 func newLinkResponse(l link.ClientLink) LinkResponse {
-	return LinkResponse{ID: l.ID, CRMID: l.CRMID, SiteID: l.SiteID, CreatedAt: l.CreatedAt}
+	return LinkResponse{ID: l.ID, CRMID: l.CRMID, SiteID: strconv.FormatInt(l.SiteID, 10), CreatedAt: l.CreatedAt}
 }
 
 // make(..., 0, n): пустой список должен сериализоваться как [], а не null.

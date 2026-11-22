@@ -21,7 +21,7 @@ func NewAssessmentHandler(service *services.ClientLinkService) *AssessmentHandle
 // @Produce json
 // @Param request body handlers.AssessmentRequest true "Идентификаторы пары"
 // @Success 200 {object} handlers.AssessmentResponse
-// @Failure 400 {object} handlers.ErrorResponse
+// @Failure 400 {object} handlers.ErrorResponse "invalid_body для отсутствующих полей или JSON-числа, invalid_id для некорректной строки ID"
 // @Failure 413 {object} handlers.ErrorResponse
 // @Failure 499 {object} handlers.ErrorResponse "Запрос отменён клиентом"
 // @Failure 500 {object} handlers.ErrorResponse
@@ -33,7 +33,15 @@ func (h *AssessmentHandler) Assess(c *gin.Context) {
 	if err := bindLinkJSON(c, &req); err != nil {
 		return
 	}
-	a, err := h.service.Assess(c.Request.Context(), req.CRMID, req.SiteID)
+	if req.CRMID == "" || req.SiteID == "" {
+		respondBadRequest(c, "invalid_body", "Укажите crm_id и site_id")
+		return
+	}
+	siteID, ok := parseSiteID(c, req.SiteID)
+	if !ok {
+		return
+	}
+	a, err := h.service.Assess(c.Request.Context(), req.CRMID, siteID)
 	if err != nil {
 		respondError(c, err)
 		return

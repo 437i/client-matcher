@@ -36,11 +36,11 @@ func (f *fixture) GetByID(context.Context, string) (client.CRMClient, error) {
 
 type fixtureSite struct{ f *fixture }
 
-func (s fixtureSite) GetByID(context.Context, string) (client.SiteClient, error) {
+func (s fixtureSite) GetByID(context.Context, int64) (client.SiteClient, error) {
 	s.f.calls = append(s.f.calls, "site")
 	return s.f.site, s.f.siteErr
 }
-func (f *fixture) LookupBySourceIDs(context.Context, string, string) (bool, bool, error) {
+func (f *fixture) LookupBySourceIDs(context.Context, string, int64) (bool, bool, error) {
 	f.calls = append(f.calls, "lookup")
 	return f.crmBusy, f.siteBusy, f.lookupErr
 }
@@ -52,7 +52,7 @@ func (f *fixture) Create(_ context.Context, d link.Decision) (link.ClientLink, e
 func (f *fixture) List(context.Context) ([]link.ClientLink, error) { panic("unexpected list") }
 func setup() (*fixture, *ClientLinkService) {
 	d := &client.Date{Year: 2001, Month: 2, Day: 3}
-	f := &fixture{crm: client.CRMClient{ID: "c", FirstName: "Иван", LastName: "Тестов", Birthday: d}, site: client.SiteClient{ID: "s", ShortName: "Иван", LastName: "Тестов", Birthday: d}, now: time.Unix(1000, 0)}
+	f := &fixture{crm: client.CRMClient{ID: "c", FirstName: "Иван", LastName: "Тестов", Birthday: d}, site: client.SiteClient{ID: 9007199254740993, ShortName: "Иван", LastName: "Тестов", Birthday: d}, now: time.Unix(1000, 0)}
 	return f, NewClientLinkService(f, fixtureSite{f}, f, outbound.NewHMACToken([32]byte{42}, f), f)
 }
 func TestAssessmentPriorities(t *testing.T) {
@@ -77,7 +77,7 @@ func TestAssessmentPriorities(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f, s := setup()
 			tc.setup(f)
-			r, err := s.Assess(context.Background(), " c ", "s")
+			r, err := s.Assess(context.Background(), " c ", 9007199254740993)
 			if !errors.Is(err, tc.want) || !slices.Equal(f.calls, tc.calls) || !slices.Equal(r.BlockedReasons, tc.reasons) {
 				t.Fatalf("assessment %+v err=%v calls=%v", r, err, f.calls)
 			}
@@ -127,7 +127,7 @@ func TestCreateRechecksAndAudits(t *testing.T) {
 			if !tc.ready {
 				f.site.ShortName = "Ваня"
 			}
-			r, err := s.Assess(ctx, "c", "s")
+			r, err := s.Assess(ctx, "c", 9007199254740993)
 			if err != nil || r.Token == nil {
 				t.Fatalf("assessment: %v", err)
 			}
@@ -139,7 +139,7 @@ func TestCreateRechecksAndAudits(t *testing.T) {
 				tc.alter(f, tok)
 			}
 			f.calls = nil
-			_, err = s.CreateLink(ctx, " c ", "s", tok, tc.confirm, tc.reason)
+			_, err = s.CreateLink(ctx, " c ", 9007199254740993, tok, tc.confirm, tc.reason)
 			calls := tc.calls
 			if calls == nil {
 				calls = []string{"crm", "site", "lookup"}

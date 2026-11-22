@@ -6,10 +6,17 @@ import (
 	"os"
 )
 
+const (
+	SiteCSV      = "csv"
+	SitePostgres = "postgres"
+)
+
 type Config struct {
-	DB     DBConfig
-	Server ServerConfig
-	CSV    CSVConfig
+	SiteSource string
+	SiteDB     DBConfig
+	DB         DBConfig
+	Server     ServerConfig
+	CSV        CSVConfig
 }
 
 type DBConfig struct {
@@ -51,8 +58,10 @@ func (r *envReader) optional(key, def string) string {
 
 func Load() (Config, error) {
 	r := &envReader{}
+	source := r.optional("SITE_SOURCE", SiteCSV)
 
 	cfg := Config{
+		SiteSource: source,
 		DB: DBConfig{
 			Host:     r.required("DB_HOST"),
 			Port:     r.required("DB_PORT"),
@@ -65,9 +74,20 @@ func Load() (Config, error) {
 			Addr: ":" + r.optional("PORT", "8080"),
 		},
 		CSV: CSVConfig{
-			CRMPath:  r.required("CRM_PATH"),
-			SitePath: r.required("SITE_PATH"),
+			CRMPath: r.required("CRM_PATH"),
 		},
+	}
+	switch source {
+	case SiteCSV:
+		cfg.CSV.SitePath = r.required("SITE_PATH")
+	case SitePostgres:
+		cfg.SiteDB = DBConfig{
+			Host: r.required("SITE_DB_HOST"), Port: r.required("SITE_DB_PORT"),
+			User: r.required("SITE_DB_USER"), Password: r.required("SITE_DB_PASSWORD"),
+			Name: r.required("SITE_DB_NAME"), SSLMode: r.required("SITE_DB_SSLMODE"),
+		}
+	default:
+		r.errs = append(r.errs, errors.New("SITE_SOURCE must be csv or postgres"))
 	}
 	if err := errors.Join(r.errs...); err != nil {
 		return Config{}, err

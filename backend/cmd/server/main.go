@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	web "github.com/437i/client-matcher/backend/internal/adapters/inbound/http"
@@ -19,6 +20,7 @@ import (
 	crmCSV "github.com/437i/client-matcher/backend/internal/adapters/outbound/crm/csv"
 	linkPG "github.com/437i/client-matcher/backend/internal/adapters/outbound/link/postgres"
 	siteCSV "github.com/437i/client-matcher/backend/internal/adapters/outbound/site/csv"
+	sitePG "github.com/437i/client-matcher/backend/internal/adapters/outbound/site/postgres"
 	"github.com/437i/client-matcher/backend/internal/application/ports"
 	"github.com/437i/client-matcher/backend/internal/application/services"
 	"github.com/437i/client-matcher/backend/internal/platform/config"
@@ -50,9 +52,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	siteRepo, err := siteCSV.NewCSVSiteRepo(cfg.CSV.SitePath)
+	siteRepo, sitePool, err := openSite(ctx, cfg)
 	if err != nil {
 		return err
+	}
+
+	if sitePool != nil {
+		defer sitePool.Close()
 	}
 
 	pool, err := db.NewPool(ctx, cfg.DB)
@@ -111,4 +117,23 @@ func run() error {
 		return fmt.Errorf("shutdown: %w", err)
 	}
 	return nil
+}
+
+func openSite(ctx context.Context, cfg config.Config) (ports.SiteReader, *pgxpool.Pool, error) {
+	switch cfg.SiteSource {
+	case config.SiteCSV:
+		repo, err := siteCSV.NewCSVSiteRepo(cfg.CSV.SitePath)
+		if err != nil {
+			return nil, nil, err
+		}
+		return repo, nil, nil
+	case config.SitePostgres:
+		pool, err := db.NewPool(ctx, cfg.SiteDB)
+		if err != nil {
+			return nil, nil, fmt.Errorf("initialize PostgreSQL site source: %w", err)
+		}
+		return sitePG.NewSiteRepo(pool), pool, nil
+	default:
+		return nil, nil, errors.New("invalid site source")
+	}
 }

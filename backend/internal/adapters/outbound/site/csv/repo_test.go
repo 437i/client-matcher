@@ -24,14 +24,14 @@ func TestSiteRepo(t *testing.T) {
 		"3586,Ваня Иванов,1982-04-15\n"+
 		"3587,Алим Бек кызы,1972-11-04\n"+ // фамилия из двух слов
 		"3588,Одиночка,\n"+
-		"empty,,\n"+
-		"bad,Имя Фамилия,2020-02-30\n"))
+		"0, ,\n"+
+		"8,Имя Фамилия,2020-02-30\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
 
-	cl, err := repo.GetByID(ctx, "3586")
+	cl, err := repo.GetByID(ctx, 3586)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,32 +39,44 @@ func TestSiteRepo(t *testing.T) {
 		t.Errorf("unexpected record: %+v", cl)
 	}
 
-	multi, err := repo.GetByID(ctx, "3587")
+	multi, err := repo.GetByID(ctx, 3587)
 	if err != nil || multi.LastName != "Бек кызы" {
 		t.Errorf("unexpected record: %+v, err %v", multi, err)
 	}
 
 	cl.Birthday.Year = 1
-	again, err := repo.GetByID(ctx, "3586")
+	again, err := repo.GetByID(ctx, 3586)
 	if err != nil || again.Birthday.Year != 1982 {
 		t.Fatalf("date copy: %+v, %v", again, err)
 	}
-	for id, name := range map[string]string{"3588": "Одиночка", "empty": ""} {
+	for id, name := range map[int64]string{3588: "Одиночка", 0: ""} {
 		record, err := repo.GetByID(ctx, id)
 		if err != nil || record.UnstructuredName != name || record.LastName != "" || record.ShortName != "" || record.Birthday != nil {
 			t.Fatalf("unknown roles: %+v, %v", record, err)
 		}
 	}
-	for _, id := range []string{"bad", "nope"} {
+	for _, id := range []int64{8, 9} {
 		if _, err := repo.GetByID(ctx, id); !errors.Is(err, client.ErrSiteNotFound) {
-			t.Errorf("GetByID(%q): got %v, want ErrSiteNotFound", id, err)
+			t.Errorf("GetByID(%d): got %v, want ErrSiteNotFound", id, err)
 		}
 	}
 }
 
 func TestSiteRepoDuplicateID(t *testing.T) {
-	_, err := NewCSVSiteRepo(writeCSV(t, "id,title,birthday\n1,Ваня Иванов,1982-04-15\n1,Петя Петров,1982-04-15\n"))
+	_, err := NewCSVSiteRepo(writeCSV(t, "id,title,birthday\n1,Ваня Иванов,1982-04-15\n+01,Петя Петров,1982-04-15\n"))
 	if !errors.Is(err, ErrDuplicateID) {
 		t.Errorf("got %v, want ErrDuplicateID", err)
+	}
+}
+
+func TestSiteRepoCanceled(t *testing.T) {
+	repo, err := NewCSVSiteRepo(writeCSV(t, "id,title,birthday\n0,Demo,\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := repo.GetByID(ctx, 0); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
 	}
 }

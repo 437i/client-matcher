@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -30,7 +31,7 @@ func connString(cfg config.DBConfig) string {
 func NewPool(ctx context.Context, cfg config.DBConfig) (*pgxpool.Pool, error) {
 	poolConfig, err := pgxpool.ParseConfig(connString(cfg))
 	if err != nil {
-		return nil, fmt.Errorf("parse db connection string: %w", err)
+		return nil, errors.New("invalid database connection configuration")
 	}
 
 	poolConfig.MaxConns = 10
@@ -41,12 +42,15 @@ func NewPool(ctx context.Context, cfg config.DBConfig) (*pgxpool.Pool, error) {
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
-		return nil, fmt.Errorf("create db pool: %w", err)
+		return nil, errors.New("create database pool failed")
 	}
 
 	if err := pingWithRetry(ctx, pool); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("db ping: %w", err)
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("db ping: %w", ctx.Err())
+		}
+		return nil, errors.New("database did not respond to ping")
 	}
 	slog.Info("db connection pool established")
 
@@ -69,7 +73,7 @@ func pingWithRetry(ctx context.Context, pool *pgxpool.Pool) error {
 			return nil
 		}
 
-		slog.Warn("db ping failed", "attempt", i, "error", err)
+		slog.Warn("db ping failed", "attempt", i)
 		if i == attempts {
 			break
 		}

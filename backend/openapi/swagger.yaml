@@ -31,6 +31,7 @@ components:
                 crm_id:
                     type: string
                 site_id:
+                    description: SiteID — строка десятичного целого от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы.
                     type: string
             required:
                 - crm_id
@@ -98,6 +99,7 @@ components:
                 reason:
                     type: string
                 site_id:
+                    description: SiteID — строка десятичного целого от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы.
                     type: string
             required:
                 - crm_id
@@ -219,7 +221,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/handlers.ErrorResponse'
-                    description: Bad Request
+                    description: invalid_body для отсутствующих полей или JSON-числа, invalid_id для некорректной строки ID
                 "413":
                     content:
                         application/json:
@@ -309,7 +311,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/handlers.ErrorResponse'
-                    description: Bad Request
+                    description: invalid_body для отсутствующих полей или JSON-числа, invalid_id для некорректной строки ID
                 "404":
                     content:
                         application/json:
@@ -396,7 +398,7 @@ paths:
         get:
             description: Возвращает клиента сайта по его ID, чтобы сверить данные перед сохранением связи.
             parameters:
-                - description: ID клиента на сайте
+                - description: Десятичное целое от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы. Некорректная строка возвращает invalid_id.
                   example: "3586"
                   in: path
                   name: id
@@ -434,6 +436,12 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/handlers.ErrorResponse'
                     description: Internal Server Error
+                "502":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/handlers.ErrorResponse'
+                    description: Источник вернул некорректные данные клиента
                 "504":
                     content:
                         application/json:

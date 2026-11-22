@@ -19,9 +19,9 @@ type AssessmentResult struct {
 	ExpiresAt      *time.Time
 }
 
-func (s *ClientLinkService) Assess(ctx context.Context, crmID, siteID string) (AssessmentResult, error) {
-	crmID, siteID = strings.TrimSpace(crmID), strings.TrimSpace(siteID)
-	if crmID == "" || siteID == "" {
+func (s *ClientLinkService) Assess(ctx context.Context, crmID string, siteID int64) (AssessmentResult, error) {
+	crmID = strings.TrimSpace(crmID)
+	if crmID == "" {
 		return AssessmentResult{}, ErrInvalidID
 	}
 	crm, crmErr := s.readCRM(ctx, crmID)
@@ -74,7 +74,7 @@ func (s *ClientLinkService) readCRM(ctx context.Context, id string) (client.CRMC
 	return record, nil
 }
 
-func (s *ClientLinkService) readSite(ctx context.Context, id string) (client.SiteClient, error) {
+func (s *ClientLinkService) readSite(ctx context.Context, id int64) (client.SiteClient, error) {
 	record, err := s.siteRepo.GetByID(ctx, id)
 	if err != nil {
 		return record, fmt.Errorf("read site record: %w", err)

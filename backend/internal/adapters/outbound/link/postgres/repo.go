@@ -122,7 +122,7 @@ func (r *PGLinkRepo) List(ctx context.Context) ([]link.ClientLink, error) {
 	return results, nil
 }
 
-func (r *PGLinkRepo) LookupBySourceIDs(ctx context.Context, crmID, siteID string) (bool, bool, error) {
+func (r *PGLinkRepo) LookupBySourceIDs(ctx context.Context, crmID string, siteID int64) (bool, bool, error) {
 	var crm, site bool
 	err := r.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM client_links WHERE crm_id=$1), EXISTS (SELECT 1 FROM client_links WHERE site_id=$2)", crmID, siteID).Scan(&crm, &site)
 	return crm, site, err

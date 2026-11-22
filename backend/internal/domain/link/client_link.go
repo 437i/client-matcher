@@ -9,14 +9,15 @@ import (
 type ClientLink struct {
 	ID        uuid.UUID
 	CRMID     string
-	SiteID    string
+	SiteID    int64
 	CreatedAt time.Time
 }
 
 type Decision struct {
-	CRMID, SiteID string
-	RuleVersion   int
-	Confirmation  *Confirmation
+	CRMID        string
+	SiteID       int64
+	RuleVersion  int
+	Confirmation *Confirmation
 }
 type Confirmation struct {
 	Reason string

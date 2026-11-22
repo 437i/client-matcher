@@ -8,5 +8,5 @@ import (
 
 type SiteReader interface {
 	// GetByID возвращает client.ErrSiteNotFound (можно обёрнутую), если записи нет.
-	GetByID(ctx context.Context, id string) (client.SiteClient, error)
+	GetByID(ctx context.Context, id int64) (client.SiteClient, error)
 }

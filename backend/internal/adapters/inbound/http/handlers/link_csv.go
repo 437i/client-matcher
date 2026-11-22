@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/437i/client-matcher/backend/internal/domain/link"
 )
@@ -20,7 +21,7 @@ func writeLinksCSV(w io.Writer, links []link.ClientLink) error {
 	for _, l := range links {
 		rec := []string{
 			l.CRMID,
-			l.SiteID,
+			strconv.FormatInt(l.SiteID, 10),
 		}
 		if err := cw.Write(rec); err != nil {
 			return fmt.Errorf("write csv record %s: %w", l.ID, err)

@@ -7,7 +7,7 @@ import (
 )
 
 type ClientLinkRepo interface {
-	LookupBySourceIDs(ctx context.Context, crmID, siteID string) (crmOccupied, siteOccupied bool, err error)
+	LookupBySourceIDs(ctx context.Context, crmID string, siteID int64) (crmOccupied, siteOccupied bool, err error)
 	Create(ctx context.Context, data link.Decision) (link.ClientLink, error)
 	List(ctx context.Context) ([]link.ClientLink, error)
 }

@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
+	"strconv"
 
 	"github.com/437i/client-matcher/backend/internal/adapters/outbound/csvutil"
+	"github.com/437i/client-matcher/backend/internal/adapters/outbound/site/shared"
 	"github.com/437i/client-matcher/backend/internal/application/ports"
 	"github.com/437i/client-matcher/backend/internal/domain/client"
 )
@@ -17,7 +18,7 @@ var ErrDuplicateID = errors.New("duplicate id")
 var siteHeader = []string{"id", "title", "birthday"}
 
 type CSVSiteRepo struct {
-	byID map[string]client.SiteClient
+	byID map[int64]client.SiteClient
 }
 
 var _ ports.SiteReader = (*CSVSiteRepo)(nil)
@@ -28,7 +29,7 @@ func NewCSVSiteRepo(path string) (*CSVSiteRepo, error) {
 		return nil, fmt.Errorf("load site csv: %w", err)
 	}
 
-	repo := &CSVSiteRepo{byID: make(map[string]client.SiteClient, len(rows))}
+	repo := &CSVSiteRepo{byID: make(map[int64]client.SiteClient, len(rows))}
 	for _, row := range rows {
 		cl, err := parseRow(row.Fields)
 		if err != nil {
@@ -36,7 +37,7 @@ func NewCSVSiteRepo(path string) (*CSVSiteRepo, error) {
 			continue
 		}
 		if _, dup := repo.byID[cl.ID]; dup {
-			return nil, fmt.Errorf("load site csv: line %d: client %s: %w", row.Line, cl.ID, ErrDuplicateID)
+			return nil, fmt.Errorf("load site csv: line %d: %w", row.Line, ErrDuplicateID)
 		}
 		repo.byID[cl.ID] = cl
 	}
@@ -45,24 +46,19 @@ func NewCSVSiteRepo(path string) (*CSVSiteRepo, error) {
 }
 
 func parseRow(f []string) (client.SiteClient, error) {
-	if f[0] == "" {
-		return client.SiteClient{}, errors.New("empty id")
+	id, err := strconv.ParseInt(f[0], 10, 64)
+	if err != nil {
+		return client.SiteClient{}, errors.New("invalid site id")
 	}
 	birthday, err := client.ParseOptionalDate(f[2])
 	if err != nil {
 		return client.SiteClient{}, err
 	}
-	parts := strings.Fields(f[1])
-	cl := client.SiteClient{ID: f[0], Birthday: birthday}
-	if len(parts) < 2 {
-		cl.UnstructuredName = f[1]
-	} else {
-		cl.ShortName, cl.LastName = parts[0], strings.Join(parts[1:], " ")
-	}
-	return cl, nil
+	unstructured, first, last := shared.ParseTitle(f[1])
+	return client.SiteClient{ID: id, Birthday: birthday, UnstructuredName: unstructured, ShortName: first, LastName: last}, nil
 }
 
-func (r *CSVSiteRepo) GetByID(ctx context.Context, id string) (client.SiteClient, error) {
+func (r *CSVSiteRepo) GetByID(ctx context.Context, id int64) (client.SiteClient, error) {
 	if err := ctx.Err(); err != nil {
 		return client.SiteClient{}, err
 	}

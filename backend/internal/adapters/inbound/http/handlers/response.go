@@ -40,8 +40,6 @@ func mapError(err error) apiError {
 		return apiError{409, "assessment_expired", "Срок проверки истёк. Повторите проверку пары"}
 	case errors.Is(err, services.ErrAssessmentStale):
 		return apiError{409, "assessment_stale", "Данные изменились. Повторите проверку пары"}
-	case errors.Is(err, services.ErrIDEmpty):
-		return apiError{http.StatusBadRequest, "id_empty", "ID не может быть пустым"}
 	case errors.Is(err, services.ErrConfirmationRequired):
 		return apiError{http.StatusUnprocessableEntity, "confirmation_required", "Подтвердите расхождения и укажите причину"}
 	case errors.Is(err, services.ErrInvalidConfirmation):

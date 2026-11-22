@@ -59,7 +59,7 @@ type stubSite struct {
 	found  client.SiteClient
 }
 
-func (s *stubSite) GetByID(context.Context, string) (client.SiteClient, error) {
+func (s *stubSite) GetByID(context.Context, int64) (client.SiteClient, error) {
 	if s.getErr != nil {
 		return client.SiteClient{}, s.getErr
 	}
@@ -93,7 +93,7 @@ var (
 		Birthday: &client.Date{Year: 1990, Month: 1, Day: 1},
 	}
 	validSite = client.SiteClient{ShortName: "Иван",
-		ID:       "1",
+		ID:       1,
 		LastName: "Иванов",
 		Birthday: &client.Date{Year: 1990, Month: 1, Day: 1},
 	}
@@ -182,6 +182,12 @@ func parityScenarios() []parityScenario {
 		},
 
 		{
+			name: "клиент сайта: некорректные данные", specKey: "GET /api/v1/site-clients/{id}",
+			method: http.MethodGet, path: "/api/v1/site-clients/1", want: http.StatusBadGateway,
+			setup: func(_ *stubCRM, site *stubSite, _ *stubLink) { site.getErr = client.ErrInvalidSourceData },
+		},
+
+		{
 			name: "связь: успех", specKey: "POST /api/v1/links",
 			method: http.MethodPost, path: "/api/v1/links", body: `{"crm_id":"1","site_id":"1"}`,
 			want: http.StatusCreated,
@@ -217,7 +223,7 @@ func parityScenarios() []parityScenario {
 			want: http.StatusUnprocessableEntity,
 			setup: func(_ *stubCRM, site *stubSite, _ *stubLink) {
 				site.found = client.SiteClient{
-					ID: "1", LastName: "Петров",
+					ID: 1, LastName: "Петров",
 					Birthday: &client.Date{Year: 1990, Month: 1, Day: 1},
 				}
 			},
@@ -227,7 +233,7 @@ func parityScenarios() []parityScenario {
 			method: http.MethodPost, path: "/api/v1/links", body: `{"crm_id":"1","site_id":"1"}`,
 			want: 422,
 			setup: func(_ *stubCRM, site *stubSite, _ *stubLink) {
-				site.found = client.SiteClient{ID: "1", Birthday: &client.Date{Year: 1990, Month: 1, Day: 1}}
+				site.found = client.SiteClient{ID: 1, Birthday: &client.Date{Year: 1990, Month: 1, Day: 1}}
 			},
 		},
 		{
@@ -494,7 +500,7 @@ func isErrorStatus(status string) bool {
 	return strings.HasPrefix(status, "4") || strings.HasPrefix(status, "5")
 }
 
-func (s *stubLink) LookupBySourceIDs(context.Context, string, string) (bool, bool, error) {
+func (s *stubLink) LookupBySourceIDs(context.Context, string, int64) (bool, bool, error) {
 	return s.crmBusy, s.siteBusy, nil
 }
 

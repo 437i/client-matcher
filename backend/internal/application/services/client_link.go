@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	ErrIDEmpty              = errors.New("id is empty")
 	ErrInvalidID            = errors.New("invalid id")
 	ErrConfirmationRequired = errors.New("confirmation required")
 	ErrInvalidConfirmation  = errors.New("invalid confirmation")
@@ -32,9 +31,9 @@ func NewClientLinkService(crm ports.CRMReader, site ports.SiteReader, links port
 	return &ClientLinkService{crmRepo: crm, siteRepo: site, linkRepo: links, tokens: tokens, clock: clock}
 }
 
-func (s *ClientLinkService) CreateLink(ctx context.Context, crmID, siteID string, token *string, confirmed bool, reason string) (link.ClientLink, error) {
-	crmID, siteID = strings.TrimSpace(crmID), strings.TrimSpace(siteID)
-	if crmID == "" || siteID == "" {
+func (s *ClientLinkService) CreateLink(ctx context.Context, crmID string, siteID int64, token *string, confirmed bool, reason string) (link.ClientLink, error) {
+	crmID = strings.TrimSpace(crmID)
+	if crmID == "" {
 		return link.ClientLink{}, ErrInvalidID
 	}
 	var claims ports.TokenClaims

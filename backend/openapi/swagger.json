@@ -43,6 +43,7 @@
                         "type": "string"
                     },
                     "site_id": {
+                        "description": "SiteID — строка десятичного целого от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы.",
                         "type": "string"
                     }
                 },
@@ -142,6 +143,7 @@
                         "type": "string"
                     },
                     "site_id": {
+                        "description": "SiteID — строка десятичного целого от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы.",
                         "type": "string"
                     }
                 },
@@ -328,7 +330,7 @@
                                 }
                             }
                         },
-                        "description": "Bad Request"
+                        "description": "invalid_body для отсутствующих полей или JSON-числа, invalid_id для некорректной строки ID"
                     },
                     "413": {
                         "content": {
@@ -474,7 +476,7 @@
                                 }
                             }
                         },
-                        "description": "Bad Request"
+                        "description": "invalid_body для отсутствующих полей или JSON-числа, invalid_id для некорректной строки ID"
                     },
                     "404": {
                         "content": {
@@ -619,7 +621,7 @@
                 "description": "Возвращает клиента сайта по его ID, чтобы сверить данные перед сохранением связи.",
                 "parameters": [
                     {
-                        "description": "ID клиента на сайте",
+                        "description": "Десятичное целое от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы. Некорректная строка возвращает invalid_id.",
                         "example": "3586",
                         "in": "path",
                         "name": "id",
@@ -679,6 +681,16 @@
                             }
                         },
                         "description": "Internal Server Error"
+                    },
+                    "502": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/handlers.ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": "Источник вернул некорректные данные клиента"
                     },
                     "504": {
                         "content": {

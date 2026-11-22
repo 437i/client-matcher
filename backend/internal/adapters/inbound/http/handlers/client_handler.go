@@ -51,16 +51,21 @@ func (h *ClientHandler) Search(c *gin.Context) {
 //	@Description	Возвращает клиента сайта по его ID, чтобы сверить данные перед сохранением связи.
 //	@Tags			site
 //	@Produce		json
-//	@Param			id	path		string	true	"ID клиента на сайте"	example(3586)
+//	@Param			id	path		string	true	"Десятичное целое от -9223372036854775808 до 9223372036854775807. Допустимы знак, ведущие нули и внешние пробелы. Некорректная строка возвращает invalid_id."	example(3586)
 //	@Success		200	{object}	handlers.SiteClientResponse
 //	@Failure		400	{object}	handlers.ErrorResponse
 //	@Failure		404	{object}	handlers.ErrorResponse
 //	@Failure		499	{object}	handlers.ErrorResponse	"Запрос отменён клиентом (нестандартный код 499)"
 //	@Failure		500	{object}	handlers.ErrorResponse
 //	@Failure		504	{object}	handlers.ErrorResponse	"Превышено время ожидания"
+//	@Failure 502 {object} handlers.ErrorResponse "Источник вернул некорректные данные клиента"
 //	@Router			/api/v1/site-clients/{id} [get]
 func (h *ClientHandler) GetSiteClient(c *gin.Context) {
-	cl, err := h.clientService.GetSiteClient(c.Request.Context(), c.Param("id"))
+	id, ok := parseSiteID(c, c.Param("id"))
+	if !ok {
+		return
+	}
+	cl, err := h.clientService.GetSiteClient(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return

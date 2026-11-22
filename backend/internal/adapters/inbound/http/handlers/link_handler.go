@@ -32,7 +32,7 @@ func NewLinkHandler(svc *services.ClientLinkService) *LinkHandler {
 //	@Produce		json
 //	@Param			request	body		handlers.CreateRequest	true	"Пара идентификаторов"
 //	@Success		201	{object}	handlers.LinkResponse
-//	@Failure		400	{object}	handlers.ErrorResponse
+//	@Failure		400	{object}	handlers.ErrorResponse "invalid_body для отсутствующих полей или JSON-числа, invalid_id для некорректной строки ID"
 //	@Failure		404	{object}	handlers.ErrorResponse
 //	@Failure		409	{object}	handlers.ErrorResponse
 //
@@ -50,8 +50,16 @@ func (h *LinkHandler) CreateLink(c *gin.Context) {
 		return
 	}
 
+	if req.CRMID == "" || req.SiteID == "" {
+		respondBadRequest(c, "invalid_body", "Укажите crm_id и site_id")
+		return
+	}
+	siteID, ok := parseSiteID(c, req.SiteID)
+	if !ok {
+		return
+	}
 	confirmed := req.Confirmed != nil && *req.Confirmed
-	result, err := h.linkService.CreateLink(c.Request.Context(), req.CRMID, req.SiteID, req.AssessmentToken, confirmed, req.Reason)
+	result, err := h.linkService.CreateLink(c.Request.Context(), req.CRMID, siteID, req.AssessmentToken, confirmed, req.Reason)
 	if err != nil {
 		respondError(c, err)
 		return
