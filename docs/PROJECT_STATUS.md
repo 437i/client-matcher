@@ -77,3 +77,15 @@ Sync завершён для трёх основных спецификаций.
 ### Claude Code Review connectivity note
 
 Claude Code в этом окружении использует кастомный провайдер ANTHROPIC_BASE_URL=https://api.wellflow.dev/v1, а не публичный Anthropic endpoint. Ошибка ENOTFOUND возникала при sandbox-запуске subprocess без сетевого доступа. Рабочий способ — запускать документированный Python wrapper через внешний Code Mode execution с сетевым разрешением, сохранять p.wait(timeout=1190) и ждать terminal session через write_stdin каждые 30 секунд до exit_code. Проверка api.wellflow.dev подтвердила DNS и HTTPS доступность без передачи credentials.
+
+
+## Stage 3 Apply / Verify
+
+Apply и технические проверки change [ssh-tunnel-infrastructure](../openspec/changes/ssh-tunnel-infrastructure/tasks.md) выполнены, 12 из 12 задач подтверждены. Preflight на ветке feat/crm-name-search прошёл на 1e316b69b8d47a18ac86e2643b5c4e1228882a83. Рабочее дерево было чистым, HEAD совпал с origin, исправление L-1 присутствовало.
+
+- Синтетическая SITE на PostgreSQL 10.23 собрана из официального исходника. Через SSH получен server_version_num=100023. SiteReader подтвердил ID, title, преобразование даты на границе суток и NULL в birthday с доступом SELECT к трём колонкам. Для OD через SSH подтверждена PostgreSQL 16.15 (160015).
+- Интеграционные и race-тесты подтвердили независимое восстановление пулов, отклонение позднего CreateResource в PrepareConn, конкурентные и прерванные Goose Up, изоляцию apps от public и освобождение ресурсов при startup и SIGTERM.
+- Локальный и production Compose собраны и проверены через frontend Nginx. Production восстановился после последовательных обрывов SITE и OD без перезапуска backend. Оба backend завершились с кодом 0. В production проверены три read-only mount, чтение от app, публикация только frontend и исключение runtime-файлов из обоих build contexts и итоговых образов.
+- Прошли go test -count=1 ./..., go test -race -count=1 ./..., отдельные интеграционные прогоны с синтетическими БД, go vet ./..., go build ./..., git diff --check и openspec validate --all --strict (9 из 9). Граф подтвердил Goose v3.27.1, pgx v5.12.0, puddle v2.2.3 и x/crypto v0.50.0.
+
+Следующий gate — независимый Code Review Stage 3. После Verify отдельно предстоит reconcile-previous-stage-decisions перед Stage 4.

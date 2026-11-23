@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -45,27 +46,41 @@ func run() error {
 	}
 
 	// ctx отменяется по Ctrl+C / SIGTERM (docker stop) — запускает graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signalContext()
 	defer stop()
+	return runConfigured(ctx, cfg)
+}
 
+func runConfigured(ctx context.Context, cfg config.Config) error {
 	crmRepo, err := crmCSV.NewCSVCRMRepo(cfg.CSV.CRMPath)
 	if err != nil {
 		return err
 	}
-	siteRepo, sitePool, err := openSite(ctx, cfg)
-	if err != nil {
-		return err
+	var siteRepo ports.SiteReader
+	var pool *pgxpool.Pool
+	if cfg.DBTransport == config.TransportSSH {
+		production, err := openProduction(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		defer production.close()
+		siteRepo = sitePG.NewSiteRepo(production.site)
+		pool = production.od
+	} else {
+		var sitePool *pgxpool.Pool
+		siteRepo, sitePool, err = openSite(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		if sitePool != nil {
+			defer sitePool.Close()
+		}
+		pool, err = db.NewPool(ctx, cfg.DB)
+		if err != nil {
+			return err
+		}
+		defer pool.Close()
 	}
-
-	if sitePool != nil {
-		defer sitePool.Close()
-	}
-
-	pool, err := db.NewPool(ctx, cfg.DB)
-	if err != nil {
-		return err
-	}
-	defer pool.Close()
 
 	linkRepo := linkPG.NewPGLinkRepo(pool)
 
@@ -87,15 +102,22 @@ func run() error {
 		return err
 	}
 
+	requestCtx, cancelRequests := context.WithCancel(context.Background())
+	defer cancelRequests()
+
 	srv := &http.Server{
 		Addr:              cfg.Server.Addr,
 		Handler:           router,
+		BaseContext:       func(net.Listener) context.Context { return requestCtx },
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	serveErr := make(chan error, 1)
 	go func() {
 		slog.Info("http server listening", "addr", cfg.Server.Addr)
@@ -113,8 +135,9 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("shutdown: %w", err)
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		cancelRequests()
+		return errors.Join(fmt.Errorf("shutdown: %w", err), srv.Close())
 	}
 	return nil
 }
@@ -136,4 +159,8 @@ func openSite(ctx context.Context, cfg config.Config) (ports.SiteReader, *pgxpoo
 	default:
 		return nil, nil, errors.New("invalid site source")
 	}
+}
+
+func signalContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 }

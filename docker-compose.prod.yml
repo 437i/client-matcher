@@ -1,0 +1,60 @@
+name: client-matcher-production
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      DB_TRANSPORT: ssh
+      SITE_SOURCE: postgres
+      PORT: "8080"
+      GIN_MODE: release
+      SITE_SSH_HOST: ${SITE_SSH_HOST:?Set SITE_SSH_HOST}
+      SITE_SSH_USER: ${SITE_SSH_USER:?Set SITE_SSH_USER}
+      SITE_SSH_PASSWORD: ${SITE_SSH_PASSWORD:?Set SITE_SSH_PASSWORD}
+      SITE_HOST: ${SITE_HOST:?Set SITE_HOST to localhost}
+      SITE_NAME: ${SITE_NAME:?Set SITE_NAME}
+      SITE_USER: ${SITE_USER:?Set SITE_USER}
+      SITE_PASSWORD: ${SITE_PASSWORD:?Set SITE_PASSWORD}
+      OD_SSH_HOST: ${OD_SSH_HOST:?Set OD_SSH_HOST}
+      OD_SSH_USER: ${OD_SSH_USER:?Set OD_SSH_USER}
+      OD_SSH_KEY: /run/client-matcher/od-key
+      OD_HOST: ${OD_HOST:?Set OD_HOST to localhost}
+      OD_NAME: ${OD_NAME:?Set OD_NAME}
+      OD_USER: ${OD_USER:?Set OD_USER}
+      OD_PASSWORD: ${OD_PASSWORD:?Set OD_PASSWORD}
+      SSH_KNOWN_HOSTS_PATH: /run/client-matcher/known_hosts
+      CRM_PATH: /run/client-matcher/crm.csv
+    volumes:
+      - type: bind
+        source: ${OD_SSH_KEY:?Set the absolute path to the OD key}
+        target: /run/client-matcher/od-key
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SSH_KNOWN_HOSTS_PATH:?Set the absolute path to known_hosts}
+        target: /run/client-matcher/known_hosts
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${CRM_PATH:?Set the absolute path to the CRM CSV}
+        target: /run/client-matcher/crm.csv
+        read_only: true
+        bind:
+          create_host_path: false
+    stop_grace_period: 20s
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz || exit 1"]
+      start_period: 165s
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
