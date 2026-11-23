@@ -668,7 +668,7 @@ Preflight → Explore → Propose → Plan Review → User Approval → Apply �
 
 ## 10. Ближайшая задача
 
-Stage 0, Stage 1 и Stage 2 реализованы. Stage 1 синхронизирован со спецификациями и архивирован. Для Stage 2 завершены Apply, Verify, Code Review и Sync. Archive остаётся отдельной операцией. После Archive следующий этап — Stage 3, SSH Tunnel Infrastructure.
+Stage 0–2 завершены. Изменения Stage 1 и Stage 2 синхронизированы с основными спецификациями и архивированы. Следующий этап — Stage 3, SSH Tunnel Infrastructure.
 
 Решение Stage 5 должно заменить текущее требование OpenSpec о поиске только по явному действию на автоматический CRM-поиск после паузы около 300 мс и достижения минимальной длины запроса. Enter и кнопка сохраняют возможность немедленного запуска.
 

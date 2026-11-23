@@ -1,6 +1,6 @@
 # Фактическое состояние Client Matcher
 
-Дата проверки: 2026-11-22. Долгосрочный план: [roadmap.md](roadmap.md).
+Дата проверки: 2026-11-23. Долгосрочный план: [roadmap.md](roadmap.md).
 
 ## Git
 
@@ -44,7 +44,7 @@ Stage 1 Code Review завершён с вердиктом READY после ис
 
 ## Stage 2 Propose
 
-Change [site-postgresql-adapter](../openspec/changes/site-postgresql-adapter/proposal.md) содержит proposal, design, три delta specs и tasks. OpenSpec strict validation прошла. Успешный основной Plan Review выполнен Claude Code 2.1.329 с `claude-sonnet-5-5`, effort medium, `--permission-mode plan`, `--tools Read,Grep,Glob`, запретом Bash/PowerShell/Edit/Write/NotebookEdit/Agent, `--strict-mcp-config`, пустым MCP config `{"mcpServers":{}}`, отключёнными hooks через `--settings`, `--permission-prompts none`, `--max-turns 20`, `--output-format stream-json` и `--verbose`. Все параметры явно переданы через argv и не наследовались. Fallback model не использовался. Python wrapper использовал `p.wait(timeout=1190)`, внешний Code Mode execution — `yield_time_ms=1300000`. Wrapper elapsed составил 276.32 секунды, Claude duration — 275605 мс, `exit_code=0`, `is_error=false`, `num_turns=26`, 25 tool calls (Read 23, Glob 2), событие `result` присутствует. Verdict — `READY WITH NOTES`. Первичные findings включали один High и два Medium, исправленные в planning artifacts.
+Change [site-postgresql-adapter](../openspec/changes/archive/2026-11-23-site-postgresql-adapter/proposal.md) содержит proposal, design, три delta specs и tasks. OpenSpec strict validation прошла. Успешный основной Plan Review выполнен Claude Code 2.1.329 с `claude-sonnet-5-5`, effort medium, `--permission-mode plan`, `--tools Read,Grep,Glob`, запретом Bash/PowerShell/Edit/Write/NotebookEdit/Agent, `--strict-mcp-config`, пустым MCP config `{"mcpServers":{}}`, отключёнными hooks через `--settings`, `--permission-prompts none`, `--max-turns 20`, `--output-format stream-json` и `--verbose`. Все параметры явно переданы через argv и не наследовались. Fallback model не использовался. Python wrapper использовал `p.wait(timeout=1190)`, внешний Code Mode execution — `yield_time_ms=1300000`. Wrapper elapsed составил 276.32 секунды, Claude duration — 275605 мс, `exit_code=0`, `is_error=false`, `num_turns=26`, 25 tool calls (Read 23, Glob 2), событие `result` присутствует. Verdict — `READY WITH NOTES`. Первичные findings включали один High и два Medium, исправленные в planning artifacts.
 
 Две диагностические попытки использовали wrapper timeout 595 и 1190 секунд, получили 49 и 57 tool calls и завершились без события `result` и без verdict. В сохранённых журналах API/network errors не зафиксированы. Wrapper остановил процессы по timeout. Широкий scope, вероятно, способствовал чрезмерному исследованию, но конкретная внутренняя причина не доказана.
 
@@ -59,7 +59,7 @@ Change [site-postgresql-adapter](../openspec/changes/site-postgresql-adapter/pro
 
 ## Stage 2 Apply / Verify
 
-Apply завершён. Коммит `478b2cf720f55f978805a16bb8205d4fd751d7dd` с сообщением `feat: add PostgreSQL site adapter` отправлен в `origin/feat/crm-name-search`. Site ID переведён на `int64` в Go и `BIGINT` в БД связей, HTTP сохранил строковый формат. Введены токены версии 2, PostgreSQL SiteReader, выбор источника CSV или PostgreSQL и отдельный пул сайта. Выполнены все 10 задач из [tasks.md](../openspec/changes/site-postgresql-adapter/tasks.md).
+Apply завершён. Коммит `478b2cf720f55f978805a16bb8205d4fd751d7dd` с сообщением `feat: add PostgreSQL site adapter` отправлен в `origin/feat/crm-name-search`. Site ID переведён на `int64` в Go и `BIGINT` в БД связей, HTTP сохранил строковый формат. Введены токены версии 2, PostgreSQL SiteReader, выбор источника CSV или PostgreSQL и отдельный пул сайта. Выполнены все 10 задач из [tasks.md](../openspec/changes/archive/2026-11-23-site-postgresql-adapter/tasks.md).
 
 Verify завершён. По отчёту Codex за Stage 2 прошли `go test -count=1 ./...`, `go test -race -count=1 ./...`, `go vet ./...`, `go build ./...`, `git diff --check` и `openspec validate --all --strict`. На двух отдельных временных PostgreSQL БД с синтетическими данными проверены SiteReader, репозиторий связей и миграция Up/Down, включая отказ на несовместимых данных. Сквозной запуск в режимах CSV и PostgreSQL подтвердил работу проверки состояния сервера, чтения карточки, оценки и сохранения связи. При ошибке выбранного источника сервер завершал запуск без перехода на CSV, открытые пулы закрывались.
 
@@ -71,7 +71,7 @@ Low-заметки Code Review
 2. Фактический тип `birthday` в схеме сайта нужно подтвердить до подключения реальной БД.
 3. Тесты можно дополнить редкими SQLSTATE и отменой запроса во время его выполнения.
 
-Sync завершён для трёх основных спецификаций. Archive ожидает отдельного выполнения.
+Sync завершён для трёх основных спецификаций. Archive завершён. Change находится в [openspec/changes/archive/2026-11-23-site-postgresql-adapter/](../openspec/changes/archive/2026-11-23-site-postgresql-adapter/). Stage 2 завершён.
 
 
 ### Claude Code Review connectivity note
