@@ -20,6 +20,8 @@
 - `internal/platform` — конфигурация и инфраструктурные подключения.
 - `migrations` — только схема собственной БД приложения.
 
+CRM читается из CSV, сайт — из CSV или отдельной PostgreSQL. Доступны direct + csv, direct + postgres и ssh + postgres. Настройки SSH приведены в [руководстве Stage 3](../docs/stage3-production.md).
+
 ## Фактические HTTP-маршруты на момент подготовки этих инструкций
 
 Сверяй их с `internal/adapters/inbound/http/router.go`: код является источником истины.
@@ -27,6 +29,7 @@
 - `GET /healthz`
 - `GET /api/v1/crm-clients?q=...`
 - `GET /api/v1/site-clients/:id`
+- `POST /api/v1/link-assessments`
 - `POST /api/v1/links`
 - `GET /api/v1/links`
 - `GET /api/v1/links/export.csv`
@@ -39,7 +42,7 @@
 - Application зависит от интерфейсов `ports`, а не от конкретных адаптеров.
 - HTTP handlers отвечают за binding, вызов application service и HTTP-представление результата; бизнес-правила не размещай в handlers.
 - Внешние источники CRM и сайта используются только для чтения.
-- Собственная PostgreSQL хранит только соответствия идентификаторов.
+- Собственная PostgreSQL хранит связи идентификаторов и аудит ручного подтверждения в той же строке.
 - Не объединяй CRM/site repositories и repository связей в одну реализацию.
 - Сохраняй DTO как отдельный HTTP-контракт; не отдавай Domain-сущности напрямую без явного решения.
 - Не вводи ORM, Redis, Kafka, микросервисы или DI-контейнер без прямой необходимости.

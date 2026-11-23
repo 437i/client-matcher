@@ -14,7 +14,7 @@
 Stage 0 завершён по критериям roadmap после полного dataset Verify и повторного Claude Code Review READY WITH NOTES без Critical/High/Medium. Stage 1: Explore/Propose выполнены, Plan Review пройден. Stage 1 завершён после Apply, Verify и повторного Claude Code Review.
 Предыдущие исправления Венгера и csv.ErrQuote закоммичены в HEAD. Прежний интерактивный review дополнен завершённым headless Code Review текущего Stage 0 scope; отчёты сохранены ниже.
 
-Текущая фаза — Close Stage 3 завершён. Apply, Verify и независимый Code Review пройдены.
+Change `reconcile-previous-stage-decisions` закрыт после повторной проверки Low-2. Следующий gate — Explore Stage 4 «Поисковый HTTP API».
 
 ## Проверенные результаты
 
@@ -104,4 +104,42 @@ Stage 3 закрыт по текущим критериям готовности
 
 Explore и Propose завершены в [reconcile-previous-stage-decisions](../openspec/changes/reconcile-previous-stage-decisions/proposal.md). Сверка выявила недостаточную проверку прав на таблицу связей при повторном SSH-запуске и устаревшие инструкции по подключению и миграциям. OpenSpec strict validation прошла для нового change и для всех 10 проверяемых элементов. Git diff check прошёл, включая отдельно проверенные новые артефакты. Выполнено 0 из 8 задач реализации.
 
-Независимый Plan Review Qwen 4 Max дал вердикт `READY WITH NOTES` без Critical и High. По M-1 в задаче 1.1 разделены владелец таблиц и `OD_USER`, уточнены эффективные колоночные права, отрицательные сценарии, положительный контроль под той же ролью и ожидаемое падение теста на исходном коде. По L-1–L-3 уточнены границы SSH-проверки, перечень файлов при Apply и сохранение обеих активных дельт при отдельном будущем Sync. Текущая фаза — корректировка плана по итогам review. Apply требует отдельного согласования.
+Независимый Plan Review Qwen 4 Max дал вердикт `READY WITH NOTES` без Critical и High. По M-1 в задаче 1.1 разделены владелец таблиц и `OD_USER`, уточнены эффективные колоночные права, отрицательные сценарии, положительный контроль под той же ролью и ожидаемое падение теста на исходном коде. По L-1–L-3 уточнены границы SSH-проверки, перечень файлов при Apply и сохранение обеих активных дельт при отдельном будущем Sync.
+
+### Apply
+
+Пользователь разрешил Apply после Plan Review. Перед реализацией `HEAD`, `origin/feat/crm-name-search` и опубликованный SHA ветки совпали на `7b2f82ae3bdbced225f288f2b304a83c9d2b883b`. Индекс и рабочее дерево были чистыми.
+
+- До исправления `TestProductionProcess/OD_readiness/missing_INSERT` упал с `HTTP listened during startup` после подготовки OD отдельной ролью-владельцем.
+- После исправления `TestProductionPostgres` и `TestProductionProcess` прошли на синтетических SITE 10.23 и OD 16.15. Проверены четыре отказа до открытия HTTP, включая одноимённую таблицу в `public`, успешный запуск под тем же `OD_USER` с полным набором колоночных прав, освобождение подключений и неизменность связей и журнала Goose.
+- `TestLoadSiteSource` прошёл. После ручного Goose Up оба direct-режима вернули HTTP 200 на `/healthz` и `/api/v1/links`. Локальная конфигурация Compose проверена командой `docker compose --env-file .env.example -f docker-compose.yml config`.
+
+Задачи 1.1–1.3 и 2.1–2.3 завершены. Задачи 3.1 и 3.2 ожидают отдельного Verify.
+
+### Verify
+
+На preflight ветка `feat/crm-name-search` и локальный `origin/feat/crm-name-search` совпали с `HEAD` на `7b2f82ae3bdbced225f288f2b304a83c9d2b883b`. Все 11 файлов Apply присутствовали в рабочем дереве. Staged и untracked-файлов не было.
+
+- Из `backend/` прошли `go test -count=1 ./...`, `go test -race -count=1 ./...`, `go vet ./...` и `go build ./...`. Регрессии CSV, Site ID, assessment и сохранения прошли.
+- Последовательный прогон `CLIENT_MATCHER_STAGE3_INTEGRATION=1 go test -p 1 -race -count=1 -v -run '^(TestProductionPostgres|TestProductionProcess)$' ./internal/platform/db ./cmd/server` прошёл. Синтетические SITE 10.23 (`100023`) и OD 16.15 (`160015`) подтверждены через локальные порты и через SSH в `TestProductionPostgres`.
+- После Goose Up в полностью мигрированной OD подтверждены отказы до открытия HTTP при отсутствии `SELECT`, `INSERT`, `INSERT` на `confirmation_reason` и `apps.client_links` при наличии доступного `public.client_links`. Под той же ограниченной ролью с полным набором колоночных прав сервер открыл HTTP. Тесты подтвердили закрытие туннелей и соединений runtime-роли, неизменность строк связей и журнала Goose.
+- После ручного Goose Up `direct + csv` и `direct + postgres` вернули HTTP 200 на `/healthz`, `/api/v1/links` и `/api/v1/site-clients/276`. Оба процесса штатно завершились по SIGTERM. `TestPostgresLinkAudit` и `TestSiteReaderPostgresIntegration` отдельно прошли с race detector на тех же синтетических БД.
+- Прошли `openspec validate reconcile-previous-stage-decisions --strict`, `openspec validate --all --strict` (10 из 10), `git diff --check` и `git diff --cached --check`. Изменения в пределах change. Все обязательные проверки Verify выполнены.
+
+Задачи 3.1 и 3.2 завершены, OpenSpec показывает `complete` (8 из 8).
+
+### Code Review и исправление Low-2
+
+Независимый Code Review Qwen 4 Max завершён с вердиктом `READY WITH NOTES` без подтверждённых Critical, High или Medium. Для Low-2 `MigrateOD` возвращает `db.ErrODLinkStorageNotReady`, а `TestProductionProcess` проверяет эту ошибку через `errors.Is`. Внешний текст ошибки сохранён дословно — `OD link storage is not ready`. Low-1 и Low-3 приняты без исправлений.
+
+После исправления прошли `go test -count=1 ./...`, `go vet ./...` и `go build ./...`. `TestProductionPostgres` и `TestProductionProcess` прошли при последовательном запуске с `CLIENT_MATCHER_STAGE3_INTEGRATION=1` и race detector на одноразовых синтетических SITE 10.23 и OD 16.15. `git diff --check` и `git diff --cached --check` прошли.
+
+Следующий gate — короткая независимая read-only проверка Low-2. После её успешного прохождения — Close текущего OpenSpec change.
+
+### Close
+
+Независимый targeted Code Review Qwen по исправлению Low-2 завершён с вердиктом `PASS`. Итог полного независимого Code Review — `READY WITH NOTES`. Low-2 исправлен через `db.ErrODLinkStorageNotReady` и проверку `errors.Is` с сохранением внешнего текста ошибки. Low-1 и Low-3 приняты без исправлений.
+
+`reconcile-previous-stage-decisions` закрыт. Apply и Verify завершены, все 8 из 8 задач OpenSpec выполнены. Обязательные проверки Verify и повторные проверки Codex после исправления Low-2 успешно пройдены. Change остаётся активным в OpenSpec со статусом `complete`. Sync и Archive выполняются отдельно.
+
+Следующий gate по [дорожной карте](roadmap.md) — Explore Stage 4 «Поисковый HTTP API».

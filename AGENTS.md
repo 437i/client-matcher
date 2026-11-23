@@ -16,8 +16,8 @@
 - Go-модуль backend: `github.com/437i/client-matcher/backend`.
 - Go module находится в `backend/go.mod`; минимальная заявленная версия проекта — Go 1.26.1.
 - Backend — Gin REST API.
-- Входные источники на тестовом этапе — CSV. В дальнейшем CRM читается через API, база сайта — напрямую из PostgreSQL.
-- Собственная база приложения хранит только связи `crm_id` ↔ `site_id`.
+- CRM читается из CSV. Сайт читается из CSV или отдельной PostgreSQL. Доступны direct + csv, direct + postgres и ssh + postgres. Подключение через SSH описано в [руководстве Stage 3](docs/stage3-production.md).
+- Собственная PostgreSQL приложения хранит связи `crm_id` ↔ `site_id` и аудит ручного подтверждения в той же строке.
 - Frontend находится в frontend/ (React + TypeScript + Vite); backend-задачи не должны менять frontend без прямого требования.
 - Не смешивай адаптеры внешних источников с хранилищем связей приложения.
 

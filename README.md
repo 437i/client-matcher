@@ -67,10 +67,10 @@ crm_id,site_id
 
 - **Backend:** Go, Gin; архитектура Ports & Adapters разделяет бизнес-логику, HTTP API и адаптеры источников данных.
 - **Источники.** Для демонстрации используются CSV. Для сайта также доступен PostgreSQL-адаптер с отдельными настройками подключения. Интеграция с реальной CRM, включая Bitrix24, запланирована на следующий этап интеграции CRM.
-- **Хранение:** PostgreSQL для связей, Goose для миграций.
+- **Хранение.** PostgreSQL хранит связи и аудит ручного подтверждения. Схему обновляет Goose.
 - **Frontend:** React и TypeScript. Типы API генерируются из OpenAPI-контракта; проверка совпадения записей выполняется на backend.
 
-Основные API-маршруты: `GET /api/v1/crm-clients`, `GET /api/v1/site-clients/{id}`, `POST /api/v1/links`, `GET /api/v1/links` и `GET /api/v1/links/export.csv`. Полная спецификация доступна в Swagger UI по адресу http://localhost:8080/docs/.
+Основные маршруты API — `GET /healthz`, `GET /api/v1/crm-clients`, `GET /api/v1/site-clients/{id}`, `POST /api/v1/link-assessments`, `POST /api/v1/links`, `GET /api/v1/links` и `GET /api/v1/links/export.csv`. Полная спецификация доступна в Swagger UI по адресу http://localhost:8080/docs/.
 
 ## Границы первой версии
 
@@ -96,11 +96,9 @@ crm_id,site_id
 
 ### Выбор источника сайта
 
-При прямом запуске backend значение SITE_SOURCE по умолчанию — csv. В этом режиме
-задайте SITE_PATH (например, ../testdata/site.csv из каталога backend).
-Для обоих режимов задайте CRM_PATH и параметры собственной БД DB_*, примените
-к ней Goose-миграции из backend/migrations, затем запустите go run ./cmd/server
-из каталога backend. Стандартный Docker Compose запускает CSV-демонстрацию.
+Стандартный `docker compose up --build -d` запускает локальную демонстрацию. Backend напрямую подключается к собственной PostgreSQL, а CRM и сайт читает из синтетических CSV. Миграции применяет отдельный сервис `migrate`.
+
+При запуске backend из каталога `backend` транспорт по умолчанию — `DB_TRANSPORT=direct`. Задайте `CRM_PATH` (например, `../testdata/crm.csv`) и параметры собственной БД `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` и `DB_NAME`. Значение `DB_SSLMODE` по умолчанию — `prefer`. Примените к собственной БД миграции из `backend/migrations` вручную через Goose, затем выполните `go run ./cmd/server`. Для режима по умолчанию `SITE_SOURCE=csv` задайте `SITE_PATH` (например, `../testdata/site.csv`).
 
 Для локальной проверки PostgreSQL создайте отдельную тестовую БД с синтетической
 таблицей public.children (id BIGINT PRIMARY KEY, title VARCHAR, birthday TIMESTAMP).
@@ -114,5 +112,6 @@ SITE_DB_PASSWORD, SITE_DB_NAME и SITE_DB_SSLMODE. Пример значений
 резервную копию и проверьте восстановление. Goose отклонит обновление, если
 существующие Site ID нельзя однозначно преобразовать в BIGINT. При откате
 Goose вернёт каноничные десятичные строки. Исходное форматирование можно
-восстановить из резервной копии. Production использует SITE_SOURCE=postgres
-и новую пустую БД связей.
+восстановить из резервной копии.
+
+Production Compose (`docker-compose.prod.yml`) запускает backend с `DB_TRANSPORT=ssh` и `SITE_SOURCE=postgres`. CRM также читается из CSV по `CRM_PATH`. Backend применяет встроенные миграции перед открытием HTTP. Требования к OD и порядок запуска описаны в [руководстве Stage 3](docs/stage3-production.md).
