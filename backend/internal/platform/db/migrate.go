@@ -12,6 +12,8 @@ import (
 	"github.com/437i/client-matcher/backend/migrations"
 )
 
+var ErrODLinkStorageNotReady = errors.New("OD link storage is not ready")
+
 func MigrateOD(ctx context.Context, pool *pgxpool.Pool) error {
 	var valid bool
 	err := pool.QueryRow(ctx, "SELECT COALESCE(current_schema() = 'apps' AND has_schema_privilege(current_schema(), 'USAGE') AND has_schema_privilege(current_schema(), 'CREATE'), false)").Scan(&valid)
@@ -31,6 +33,26 @@ func MigrateOD(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	if _, err := provider.Up(ctx); err != nil {
 		return errors.New("apply OD migrations failed")
+	}
+	// SELECT also covers the columns returned by PGLinkRepo.Create's RETURNING.
+	err = pool.QueryRow(ctx, `
+		SELECT COALESCE(bool_and(COALESCE(has_column_privilege(
+			to_regclass('apps.client_links'), column_name, privilege), false)), false)
+		FROM (VALUES
+			('id', 'SELECT'),
+			('crm_id', 'SELECT'),
+			('site_id', 'SELECT'),
+			('created_at', 'SELECT'),
+			('crm_id', 'INSERT'),
+			('site_id', 'INSERT'),
+			('manually_confirmed', 'INSERT'),
+			('confirmation_reason', 'INSERT'),
+			('confirmation_codes', 'INSERT'),
+			('confirmed_at', 'INSERT'),
+			('assessment_rule_version', 'INSERT')
+		) AS required(column_name, privilege)`).Scan(&valid)
+	if err != nil || !valid {
+		return ErrODLinkStorageNotReady
 	}
 	return nil
 }
