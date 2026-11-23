@@ -32,7 +32,7 @@ Stage 0 завершён по критериям roadmap после полног
 ## Gate и следующий шаг
 
 Stage 0 gate закрыт. Stage 1 change: openspec/changes/matching-assessment-link-confirmation, proposal/specs/design/tasks созданы, strict validation 6/6. Первый Plan Review выявил четыре Medium; исправлены в планах, финальный review подтвердил отсутствие Critical/High/Medium.
-Stage 1 gate закрыт. Выполнены OpenSpec Sync и Archive. Архивированный change находится в `openspec/changes/archive/2026-11-21-matching-assessment-link-confirmation/`. Stage 2 перешёл от Explore к Propose. Apply требует прохождения Plan Review и отдельного разрешения пользователя.
+Stage 1 gate закрыт. Выполнены OpenSpec Sync и Archive. Архивированный change находится в `openspec/changes/archive/2026-11-21-matching-assessment-link-confirmation/`. Stage 2 прошёл Explore, Propose и Plan Review.
 
 ## Итоговые review gates
 
@@ -48,7 +48,7 @@ Change [site-postgresql-adapter](../openspec/changes/site-postgresql-adapter/pro
 
 Две диагностические попытки использовали wrapper timeout 595 и 1190 секунд, получили 49 и 57 tool calls и завершились без события `result` и без verdict. В сохранённых журналах API/network errors не зафиксированы. Wrapper остановил процессы по timeout. Широкий scope, вероятно, способствовал чрезмерному исследованию, но конкретная внутренняя причина не доказана.
 
-Успешный follow-up был ограничен `design.md` и `tasks.md`, использовал `--max-turns 4`, `p.wait(timeout=180)` и внешний `yield_time_ms=650000`. Wrapper elapsed составил 75.89 секунды, Claude duration — 75401 мс, `exit_code=0`, `is_error=false`, `num_turns=3`, два Read tool calls и событие `result`. Verdict — `READY WITH NOTES`, Critical/High/Medium отсутствуют. Оставшиеся Low-заметки касались явного сопоставления `infinity`, `-infinity` и дат вне диапазона с `client.ErrInvalidSourceData`, а также default `SITE_SOURCE=csv`. Эти уточнения внесены в текущем корректирующем изменении в `design.md` и `tasks.md`. После изменений strict validation и `git diff --check` повторно прошли. Plan Review gate закрыт, Apply требует отдельного разрешения пользователя.
+Успешный follow-up был ограничен `design.md` и `tasks.md`, использовал `--max-turns 4`, `p.wait(timeout=180)` и внешний `yield_time_ms=650000`. Wrapper elapsed составил 75.89 секунды, Claude duration — 75401 мс, `exit_code=0`, `is_error=false`, `num_turns=3`, два Read tool calls и событие `result`. Verdict — `READY WITH NOTES`, Critical/High/Medium отсутствуют. Оставшиеся Low-заметки касались явного сопоставления `infinity`, `-infinity` и дат вне диапазона с `client.ErrInvalidSourceData`, а также default `SITE_SOURCE=csv`. Эти уточнения внесены в текущем корректирующем изменении в `design.md` и `tasks.md`. После изменений strict validation и `git diff --check` повторно прошли. Plan Review gate закрыт. Последующее состояние реализации зафиксировано в разделе Stage 2 Apply / Verify.
 
 - Site ID — `public.children.id` (`bigserial`). Внутренний тип переводится на `int64`, хранилище связей на `BIGINT` новой Goose-миграцией, HTTP сохраняет строки.
 - `birthday` преобразуется как `((birthday AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date`. NULL соответствует `nil`. Некорректная дата возвращает ошибку чтения источника.
@@ -59,11 +59,19 @@ Change [site-postgresql-adapter](../openspec/changes/site-postgresql-adapter/pro
 
 ## Stage 2 Apply / Verify
 
-Stage 2 Apply реализован в рабочем дереве без commit/push. Сквозной Site ID переведён на int64, HTTP сохранил строковый формат, токены используют версию 2, добавлены миграция TEXT→BIGINT, PostgreSQL SiteReader, выбор CSV/PostgreSQL и отдельный pool сайта.
+Apply завершён. Коммит `478b2cf720f55f978805a16bb8205d4fd751d7dd` с сообщением `feat: add PostgreSQL site adapter` отправлен в `origin/feat/crm-name-search`. Site ID переведён на `int64` в Go и `BIGINT` в БД связей, HTTP сохранил строковый формат. Введены токены версии 2, PostgreSQL SiteReader, выбор источника CSV или PostgreSQL и отдельный пул сайта. Выполнены все 10 задач из [tasks.md](../openspec/changes/site-postgresql-adapter/tasks.md).
 
-Проверки прошли: `go test -count=1 ./...`, `go test -race -count=1 ./...`, `go vet ./...`, `go build ./...`, `git diff --check`, `openspec validate --all --strict`. Интеграционные тесты SiteReader и link repository прошли на отдельных временных синтетических PostgreSQL БД. Сквозной запуск сервера прошёл для CSV и PostgreSQL, включая health, карточку, assessment, создание связи, отсутствие fallback и закрытие pool.
+Verify завершён. По отчёту Codex за Stage 2 прошли `go test -count=1 ./...`, `go test -race -count=1 ./...`, `go vet ./...`, `go build ./...`, `git diff --check` и `openspec validate --all --strict`. На двух отдельных временных PostgreSQL БД с синтетическими данными проверены SiteReader, репозиторий связей и миграция Up/Down, включая отказ на несовместимых данных. Сквозной запуск в режимах CSV и PostgreSQL подтвердил работу проверки состояния сервера, чтения карточки, оценки и сохранения связи. При ошибке выбранного источника сервер завершал запуск без перехода на CSV, открытые пулы закрывались.
 
-Claude Code Review Stage 2 завершён через документированный Python wrapper и внешний Code Mode execution. Wrapper использовал p.wait(timeout=1190), внешний yield_time_ms=1300000, --max-turns 20, Read,Grep,Glob, пустой MCP config и read-only ограничения. Результат exit_code=0, is_error=false, одно событие result, 85 tool calls, verdict READY WITH NOTES, подтверждённых Critical/High/Medium нет. Low notes переданы как будущие улучшения. Stage 2 Apply/Verify/Code Review gate закрыты, Sync и Archive не выполнялись.
+Code Review пройден с вердиктом `READY WITH NOTES`. Подтверждённых Critical, High и Medium нет. Claude `claude-sonnet-5-5` с effort medium запущен через документированный Python wrapper с `p.wait(timeout=1190)`, внешним `yield_time_ms=1300000` и `--max-turns 20`. Использованы только `Read,Grep,Glob` и пустой MCP config. Зафиксированы `exit_code=0`, `is_error=false`, событие `result` и 85 вызовов инструментов.
+
+Low-заметки Code Review
+
+1. Канонизация строкового Site ID во frontend относится к Stage 5.
+2. Фактический тип `birthday` в схеме сайта нужно подтвердить до подключения реальной БД.
+3. Тесты можно дополнить редкими SQLSTATE и отменой запроса во время его выполнения.
+
+Sync завершён для трёх основных спецификаций. Archive ожидает отдельного выполнения.
 
 
 ### Claude Code Review connectivity note
