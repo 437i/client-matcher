@@ -1,16 +1,20 @@
 # Фактическое состояние Client Matcher
 
-Дата проверки: 2026-11-23. Долгосрочный план: [roadmap.md](roadmap.md).
+Дата проверки: 2026-11-24. Долгосрочный план: [roadmap.md](roadmap.md).
 
 ## Git
 
 На preflight Stage 2 Propose ветка `feat/crm-name-search` и локальный tracking ref `origin/feat/crm-name-search` совпали на `cab2621fa1f81bbd316f69fbdec02686818a059c` без fetch. Исходное рабочее дерево было чистым.
 Дополнительная проверка Stage 0: для site ID `1326` («Азамат Далгатов») на полном синтетическом CRM fixture подтверждено отсутствие кандидатов — `CRMRepo.Search` возвращает `[]`. Сценарий добавлен в `TestStage0FullDataset`. Производственный код не изменялся. Проверки `go test -count=1 -run '^TestStage0FullDataset$' -v ./internal/adapters/outbound/crm/csv`, `go test -count=1 ./...` и `git diff --check` завершились успешно.
 
+На preflight Stage 3 Close ветка `feat/crm-name-search` и локальный tracking ref `origin/feat/crm-name-search` совпали на `3d02baacf7b013bf1652a6e201df1088825b53e7`. Сверка выполнена без fetch. Рабочее дерево и индекс были чистыми, включая проверку untracked-файлов.
+
 ## Этапы и фаза
 
 Stage 0 завершён по критериям roadmap после полного dataset Verify и повторного Claude Code Review READY WITH NOTES без Critical/High/Medium. Stage 1: Explore/Propose выполнены, Plan Review пройден. Stage 1 завершён после Apply, Verify и повторного Claude Code Review.
 Предыдущие исправления Венгера и csv.ErrQuote закоммичены в HEAD. Прежний интерактивный review дополнен завершённым headless Code Review текущего Stage 0 scope; отчёты сохранены ниже.
+
+Текущая фаза — Close Stage 3 завершён. Apply, Verify и независимый Code Review пройдены.
 
 ## Проверенные результаты
 
@@ -33,6 +37,8 @@ Stage 0 завершён по критериям roadmap после полног
 
 Stage 0 gate закрыт. Stage 1 change: openspec/changes/matching-assessment-link-confirmation, proposal/specs/design/tasks созданы, strict validation 6/6. Первый Plan Review выявил четыре Medium; исправлены в планах, финальный review подтвердил отсутствие Critical/High/Medium.
 Stage 1 gate закрыт. Выполнены OpenSpec Sync и Archive. Архивированный change находится в `openspec/changes/archive/2026-11-21-matching-assessment-link-confirmation/`. Stage 2 прошёл Explore, Propose и Plan Review.
+
+Stage 3 gate закрыт. Перед Stage 4 необходимо отдельно выполнить `reconcile-previous-stage-decisions` в собственном OpenSpec change.
 
 ## Итоговые review gates
 
@@ -79,13 +85,23 @@ Sync завершён для трёх основных спецификаций.
 Claude Code в этом окружении использует кастомный провайдер ANTHROPIC_BASE_URL=https://api.wellflow.dev/v1, а не публичный Anthropic endpoint. Ошибка ENOTFOUND возникала при sandbox-запуске subprocess без сетевого доступа. Рабочий способ — запускать документированный Python wrapper через внешний Code Mode execution с сетевым разрешением, сохранять p.wait(timeout=1190) и ждать terminal session через write_stdin каждые 30 секунд до exit_code. Проверка api.wellflow.dev подтвердила DNS и HTTPS доступность без передачи credentials.
 
 
-## Stage 3 Apply / Verify
+## Stage 3 Apply / Verify / Code Review / Close
 
-Apply и технические проверки change [ssh-tunnel-infrastructure](../openspec/changes/ssh-tunnel-infrastructure/tasks.md) выполнены, 12 из 12 задач подтверждены. Preflight на ветке feat/crm-name-search прошёл на 1e316b69b8d47a18ac86e2643b5c4e1228882a83. Рабочее дерево было чистым, HEAD совпал с origin, исправление L-1 присутствовало.
+Apply и Verify change [ssh-tunnel-infrastructure](../openspec/changes/ssh-tunnel-infrastructure/tasks.md) завершены. Выполнены все 12 задач. На preflight перед Apply ветка `feat/crm-name-search` и локальный upstream совпали на `1e316b69b8d47a18ac86e2643b5c4e1228882a83`. Рабочее дерево было чистым, в задачах уже было уточнение о тесте отказа при зашифрованном OD SSH-ключе. Ниже зафиксированы результаты технических проверок Codex при Verify.
 
 - Синтетическая SITE на PostgreSQL 10.23 собрана из официального исходника. Через SSH получен server_version_num=100023. SiteReader подтвердил ID, title, преобразование даты на границе суток и NULL в birthday с доступом SELECT к трём колонкам. Для OD через SSH подтверждена PostgreSQL 16.15 (160015).
 - Интеграционные и race-тесты подтвердили независимое восстановление пулов, отклонение позднего CreateResource в PrepareConn, конкурентные и прерванные Goose Up, изоляцию apps от public и освобождение ресурсов при startup и SIGTERM.
 - Локальный и production Compose собраны и проверены через frontend Nginx. Production восстановился после последовательных обрывов SITE и OD без перезапуска backend. Оба backend завершились с кодом 0. В production проверены три read-only mount, чтение от app, публикация только frontend и исключение runtime-файлов из обоих build contexts и итоговых образов.
 - Прошли go test -count=1 ./..., go test -race -count=1 ./..., отдельные интеграционные прогоны с синтетическими БД, go vet ./..., go build ./..., git diff --check и openspec validate --all --strict (9 из 9). Граф подтвердил Goose v3.27.1, pgx v5.12.0, puddle v2.2.3 и x/crypto v0.50.0.
 
-Следующий gate — независимый Code Review Stage 3. После Verify отдельно предстоит reconcile-previous-stage-decisions перед Stage 4.
+Независимый Code Review Qwen 4 Max завершён с вердиктом `READY WITH NOTES`. Подтверждённых Critical, High и Medium нет. Reviewer провёл статический анализ без запуска тестов, Docker и миграций.
+
+Low L-1 принят как необязательное улучшение. В `backend/internal/platform/sshtunnel/tunnel.go` реализован лимит `maxForwards = 32`. Отдельного теста с 32 активными пробросами и отказом 33-му пока нет. Отдельный тест half-close в `relay` также оставлен как необязательное улучшение. Reviewer упомянул его без оформления finding.
+
+Stage 3 закрыт по текущим критериям готовности. OpenSpec change имеет статус `complete` и остаётся в списке активных изменений.
+
+## Сверка Stage 0–2 со Stage 3
+
+Explore и Propose завершены в [reconcile-previous-stage-decisions](../openspec/changes/reconcile-previous-stage-decisions/proposal.md). Сверка выявила недостаточную проверку прав на таблицу связей при повторном SSH-запуске и устаревшие инструкции по подключению и миграциям. OpenSpec strict validation прошла для нового change и для всех 10 проверяемых элементов. Git diff check прошёл, включая отдельно проверенные новые артефакты. Выполнено 0 из 8 задач реализации.
+
+Независимый Plan Review Qwen 4 Max дал вердикт `READY WITH NOTES` без Critical и High. По M-1 в задаче 1.1 разделены владелец таблиц и `OD_USER`, уточнены эффективные колоночные права, отрицательные сценарии, положительный контроль под той же ролью и ожидаемое падение теста на исходном коде. По L-1–L-3 уточнены границы SSH-проверки, перечень файлов при Apply и сохранение обеих активных дельт при отдельном будущем Sync. Текущая фаза — корректировка плана по итогам review. Apply требует отдельного согласования.
