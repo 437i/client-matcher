@@ -4,12 +4,15 @@
 
 ## Stage 4 — Bitrix24 Adapter
 
-План bitrix24-crm-adapter получил READY после трёх раундов независимого Claude Plan Review и утверждён владельцем. Apply и локальный Verify завершены на ветке feat/crm-name-search от c6a330aa4f9f5b8dd63bd453470eb75cc57b8dbf. В OpenSpec выполнено 29 из 30 задач. Задача 13.1 открыта, независимый Code Review организует владелец. [Задачи](../openspec/changes/bitrix24-crm-adapter/tasks.md)
+План `bitrix24-crm-adapter` получил `READY` после трёх раундов независимого Claude Plan Review и утверждён владельцем. Apply начался от `c6a330aa4f9f5b8dd63bd453470eb75cc57b8dbf` на ветке `feat/crm-name-search`. Реализация и локальный Verify завершены. [Задачи](../openspec/changes/bitrix24-crm-adapter/tasks.md)
 
 - Go 1.26.1. Успешны go test -count=1 ./..., go vet ./..., go build ./..., go mod verify и проверка версии B24GoSDK v0.2.0. Пройдены CSV Stage 0 (200 CRM / 55 Site), локальные Bitrix HTTP/TLS, HTTP parity и сквозные Search, Assess и CreateLink. Интеграционные тесты с отдельными PostgreSQL оставались отключёнными.
 - Успешны строгая валидация change и всех 11 элементов OpenSpec, git diff --check и обе проверки Compose config --quiet с синтетическим окружением. SHA-256 HTML-макета совпал с preflight.
-- Замеры fake portal и открытые проверки прав, OR, сортировки, collation, next, пустых UF, квот, задержек, NOT_FOUND и ingress описаны в техническом документе. Реальный webhook и production smoke test ожидают разрешённого доступа. [Адаптер и чеклист](bitrix24-adapter.md)
-- После Code Review с вердиктом READY WITH NOTES увеличен локальный бюджет до 20 страниц, сохранены ошибки контекста при сбое декодирования GetByID и защищено сопоставление токенов для серверного фильтра. Повторный Verify прошёл на локальных синтетических данных. Целевые тесты, полный Go-прогон, race-прогон для затронутых и сквозных пакетов, vet, build, mod verify и обе строгие проверки OpenSpec успешны. Тесты с PostgreSQL были отключены. Следующий gate — повторный независимый Code Review. Задача 13.1 открыта.
+- Замеры fake portal и открытые проверки прав, OR, сортировки, collation, next, пустых UF, квот, задержек, NOT_FOUND и ingress описаны в техническом документе. Проверки на реальном Bitrix24, production smoke test и работа с production PostgreSQL отложены до разрешённого доступа. [Адаптер и чеклист](bitrix24-adapter.md)
+- После Code Review с вердиктом READY WITH NOTES увеличен локальный бюджет до 20 страниц, сохранены ошибки контекста при сбое декодирования GetByID и защищено сопоставление токенов для серверного фильтра. Повторный Verify прошёл на локальных синтетических данных. Целевые тесты, полный Go-прогон, race-прогон для затронутых и сквозных пакетов, vet, build, mod verify и обе строгие проверки OpenSpec успешны. Тесты с PostgreSQL были отключены.
+- Исправление F-1 принято. При нарушении инварианта сопоставления токенов адаптер возвращает `errTokenAlignment` до построения фильтра и вызова Bitrix24. HTTP использует существующий `500 internal_error`. Пустой запрос по-прежнему даёт пустую выдачу. После исправления прошли целевые Go- и HTTP-тесты, `go vet`, `go build ./...`, `git diff --check` и две строгие проверки OpenSpec. Общий Go-прогон прошёл с исключением четырёх интеграционных групп, требующих отдельного окружения. Финальный независимый Code Review дал `READY` без новых подтверждённых дефектов.
+
+Project Close Stage 4 оформлен. Владелец подтвердил выполнение задачи 13.1. Все 30 из 30 задач выполнены. Change остаётся активным в OpenSpec со статусом `complete`. Sync и Archive выполняются отдельно по запросу. Следующий gate — Explore этапа 5 «Поисковый HTTP API». [Задачи](../openspec/changes/bitrix24-crm-adapter/tasks.md) · [Дорожная карта](roadmap.md#этап-5-поисковый-http-api)
 
 ## Git
 
@@ -151,4 +154,4 @@ Explore и Propose завершены в [reconcile-previous-stage-decisions](..
 
 `reconcile-previous-stage-decisions` закрыт. Apply и Verify завершены, все 8 из 8 задач OpenSpec выполнены. Обязательные проверки Verify и повторные проверки Codex после исправления Low-2 успешно пройдены. Change остаётся активным в OpenSpec со статусом `complete`. Sync и Archive выполняются отдельно.
 
-Следующий gate по [дорожной карте](roadmap.md) — независимый Code Review Stage 4 «Bitrix24 Adapter».
+Итог независимого Code Review и Project Close приведены в [разделе Stage 4](#stage-4--bitrix24-adapter).

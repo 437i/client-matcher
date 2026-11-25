@@ -579,7 +579,7 @@ Preflight → Explore → Propose → Plan Review → User Approval → Apply �
 
 ## 10. Ближайшая задача
 
-Stage 0–3 завершены. Изменения Stage 1 и Stage 2 синхронизированы с основными спецификациями и архивированы. [Сверка решений предыдущих этапов](../openspec/changes/reconcile-previous-stage-decisions/tasks.md) завершена. Ближайший gate — независимый Code Review Stage 4 «Bitrix24 Adapter». Актуальная фаза указана в [PROJECT_STATUS.md](PROJECT_STATUS.md).
+Stage 0–3 завершены. Изменения Stage 1 и Stage 2 синхронизированы с основными спецификациями и архивированы. [Сверка решений предыдущих этапов](../openspec/changes/reconcile-previous-stage-decisions/tasks.md) завершена. Stage 4 «Bitrix24 Adapter» завершён после Verify и независимого Code Review с итогом `READY`. Change остаётся в списке активных со статусом `complete` (30 из 30 задач). Следующий gate — Explore [этапа 5 «Поисковый HTTP API»](#этап-5-поисковый-http-api). [Текущий статус](PROJECT_STATUS.md#stage-4--bitrix24-adapter)
 
 Решение Stage 6 должно заменить текущее требование OpenSpec о поиске только по явному действию на автоматический CRM-поиск после паузы около 300 мс и достижения минимальной длины запроса. Enter и кнопка сохраняют возможность немедленного запуска.
 
