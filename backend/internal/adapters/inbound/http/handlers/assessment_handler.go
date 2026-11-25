@@ -1,9 +1,11 @@
 package handlers
 
 import (
-	"github.com/437i/client-matcher/backend/internal/application/services"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/437i/client-matcher/backend/internal/application/services"
+	"github.com/437i/client-matcher/backend/internal/domain/matcher"
+	"github.com/gin-gonic/gin"
 )
 
 type AssessmentHandler struct{ service *services.ClientLinkService }
@@ -48,6 +50,11 @@ func (h *AssessmentHandler) Assess(c *gin.Context) {
 	}
 	checks := make([]AssessmentCheckResponse, 0, len(a.Checks))
 	for _, check := range a.Checks {
+		if check.Field == matcher.FieldLastName && a.FullNameMismatch != nil {
+			check.Code = matcher.CodeMismatch
+			check.CRMValue = &a.FullNameMismatch.CRMValue
+			check.SiteValue = &a.FullNameMismatch.SiteValue
+		}
 		checks = append(checks, AssessmentCheckResponse{Field: string(check.Field), Code: string(check.Code), CRMValue: check.CRMValue, SiteValue: check.SiteValue})
 	}
 	c.JSON(http.StatusOK, AssessmentResponse{Status: string(a.Status), Checks: checks, ConfirmationRequired: a.ConfirmationRequired, Token: a.Token, ExpiresAt: a.ExpiresAt, BlockedReasons: a.BlockedReasons})

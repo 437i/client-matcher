@@ -66,7 +66,7 @@ crm_id,site_id
 ## Реализация
 
 - **Backend:** Go, Gin; архитектура Ports & Adapters разделяет бизнес-логику, HTTP API и адаптеры источников данных.
-- **Источники.** Для демонстрации используются CSV. Для сайта также доступен PostgreSQL-адаптер с отдельными настройками подключения. Интеграция с реальной CRM, включая Bitrix24, запланирована на следующий этап интеграции CRM.
+- **Источники.** Для демонстрации используются CSV. Для сайта также доступен PostgreSQL-адаптер с отдельными настройками подключения. Production использует отдельный [адаптер Bitrix24](docs/bitrix24-adapter.md).
 - **Хранение.** PostgreSQL хранит связи и аудит ручного подтверждения. Схему обновляет Goose.
 - **Frontend:** React и TypeScript. Типы API генерируются из OpenAPI-контракта; проверка совпадения записей выполняется на backend.
 
@@ -114,4 +114,6 @@ SITE_DB_PASSWORD, SITE_DB_NAME и SITE_DB_SSLMODE. Пример значений
 Goose вернёт каноничные десятичные строки. Исходное форматирование можно
 восстановить из резервной копии.
 
-Production Compose (`docker-compose.prod.yml`) запускает backend с `DB_TRANSPORT=ssh` и `SITE_SOURCE=postgres`. CRM также читается из CSV по `CRM_PATH`. Backend применяет встроенные миграции перед открытием HTTP. Требования к OD и порядок запуска описаны в [руководстве Stage 3](docs/stage3-production.md).
+Локальный режим `CRM_SOURCE=csv` используется по умолчанию и требует `CRM_PATH`. Режим `CRM_SOURCE=bitrix24` требует `BITRIX24_WEBHOOK_URL` из защищённого окружения. При недоступности Bitrix24 запрос завершается технической ошибкой. Переход на CSV выполняется явным выбором режима.
+
+Production Compose (`docker-compose.prod.yml`) выбирает Bitrix24 для CRM и использует `DB_TRANSPORT=ssh` и `SITE_SOURCE=postgres`. Backend применяет встроенные миграции перед открытием HTTP. Требования к OD и порядок запуска описаны в [руководстве Stage 3](docs/stage3-production.md).

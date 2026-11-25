@@ -3,6 +3,7 @@ package client
 import "strings"
 
 type CRMClient struct {
+	SourceFullName   string
 	UnstructuredName string
 	ID               string
 	LastName         string
@@ -12,8 +13,11 @@ type CRMClient struct {
 	Clinic           string
 }
 
-// FullName возвращает ФИО в порядке «Фамилия Имя Отчество».
+// FullName возвращает исходное имя CRM или собирает его из доступных частей.
 func (c CRMClient) FullName() string {
+	if strings.TrimSpace(c.SourceFullName) != "" {
+		return c.SourceFullName
+	}
 	if c.UnstructuredName != "" {
 		return c.UnstructuredName
 	}

@@ -4,11 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
 const (
+	CRMCSV          = "csv"
+	CRMBitrix24     = "bitrix24"
 	SiteCSV         = "csv"
 	SitePostgres    = "postgres"
 	TransportDirect = "direct"
@@ -16,15 +20,17 @@ const (
 )
 
 type Config struct {
-	SiteSource     string
-	DBTransport    string
-	SiteSSH        SSHConfig
-	ODSSH          SSHConfig
-	KnownHostsPath string
-	SiteDB         DBConfig
-	DB             DBConfig
-	Server         ServerConfig
-	CSV            CSVConfig
+	CRMSource          string
+	Bitrix24WebhookURL string
+	SiteSource         string
+	DBTransport        string
+	SiteSSH            SSHConfig
+	ODSSH              SSHConfig
+	KnownHostsPath     string
+	SiteDB             DBConfig
+	DB                 DBConfig
+	Server             ServerConfig
+	CSV                CSVConfig
 }
 
 type SSHConfig struct {
@@ -76,10 +82,23 @@ func Load() (Config, error) {
 	source := r.optional("SITE_SOURCE", SiteCSV)
 
 	cfg := Config{
+		CRMSource:   r.optional("CRM_SOURCE", CRMCSV),
 		SiteSource:  source,
 		DBTransport: r.optional("DB_TRANSPORT", TransportDirect),
 		Server:      ServerConfig{Addr: ":" + r.optional("PORT", "8080")},
-		CSV:         CSVConfig{CRMPath: r.required("CRM_PATH")},
+	}
+	switch cfg.CRMSource {
+	case CRMCSV:
+		cfg.CSV.CRMPath = r.required("CRM_PATH")
+	case CRMBitrix24:
+		cfg.Bitrix24WebhookURL = r.required("BITRIX24_WEBHOOK_URL")
+		if cfg.Bitrix24WebhookURL != "" {
+			if err := ValidateBitrix24WebhookURL(cfg.Bitrix24WebhookURL); err != nil {
+				r.errs = append(r.errs, err)
+			}
+		}
+	default:
+		r.errs = append(r.errs, errors.New("CRM_SOURCE must be csv or bitrix24"))
 	}
 	if source != SiteCSV && source != SitePostgres {
 		r.errs = append(r.errs, errors.New("SITE_SOURCE must be csv or postgres"))
@@ -114,6 +133,24 @@ func Load() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func ValidateBitrix24WebhookURL(raw string) error {
+	invalid := errors.New("BITRIX24_WEBHOOK_URL must be an HTTPS classic webhook URL")
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil ||
+		strings.ContainsAny(raw, "%?#\\") {
+		return invalid
+	}
+	parts := strings.Split(u.Path, "/")
+	if len(parts) != 5 || parts[0] != "" || parts[1] != "rest" || parts[4] != "" {
+		return invalid
+	}
+	id, err := strconv.ParseUint(parts[2], 10, 64)
+	if err != nil || id == 0 || parts[3] == "" || parts[3] == "." || parts[3] == ".." || u.EscapedPath() != u.Path {
+		return invalid
+	}
+	return nil
 }
 
 func (r *envReader) database(prefix string, tunnel bool) DBConfig {

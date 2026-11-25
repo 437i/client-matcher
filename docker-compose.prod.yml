@@ -23,7 +23,8 @@ services:
       OD_USER: ${OD_USER:?Set OD_USER}
       OD_PASSWORD: ${OD_PASSWORD:?Set OD_PASSWORD}
       SSH_KNOWN_HOSTS_PATH: /run/client-matcher/known_hosts
-      CRM_PATH: /run/client-matcher/crm.csv
+      CRM_SOURCE: bitrix24
+      BITRIX24_WEBHOOK_URL: ${BITRIX24_WEBHOOK_URL:?Set BITRIX24_WEBHOOK_URL}
     volumes:
       - type: bind
         source: ${OD_SSH_KEY:?Set the absolute path to the OD key}
@@ -34,12 +35,6 @@ services:
       - type: bind
         source: ${SSH_KNOWN_HOSTS_PATH:?Set the absolute path to known_hosts}
         target: /run/client-matcher/known_hosts
-        read_only: true
-        bind:
-          create_host_path: false
-      - type: bind
-        source: ${CRM_PATH:?Set the absolute path to the CRM CSV}
-        target: /run/client-matcher/crm.csv
         read_only: true
         bind:
           create_host_path: false

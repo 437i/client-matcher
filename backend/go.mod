@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
+	github.com/bitrix24/b24gosdk v0.2.0
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0

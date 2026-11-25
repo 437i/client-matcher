@@ -4,7 +4,7 @@ context: |
   Проект: client-matcher — небольшое веб-приложение для ручного сопоставления ID клиента в CRM и ID клиента на сайте.
   Репозиторий содержит Go backend в backend/; Go module: github.com/437i/client-matcher/backend; версия Go из go.mod — 1.26.1.
   Backend построен на Gin и использует Ports & Adapters: Domain, Application (ports/services), inbound HTTP и outbound adapters.
-  CRM читается из CSV. Сайт читается из CSV или отдельной PostgreSQL. Доступны direct + csv, direct + postgres и ssh + postgres. Настройки SSH описаны в docs/stage3-production.md.
+  CRM читается из синтетического CSV локально или Bitrix24 в production. Оба адаптера относятся к outbound и отделены от OD. См. docs/bitrix24-adapter.md. Сайт читается из CSV или отдельной PostgreSQL. Доступны direct + csv, direct + postgres и ssh + postgres. Настройки SSH описаны в docs/stage3-production.md.
   Собственная PostgreSQL хранит связи идентификаторов и аудит ручного подтверждения в той же строке.
   Фактическое поведение API определяется Gin router, handlers, HTTP DTO, response mapping и тестами, а не устаревшими описаниями.
   CSV проекта и fixtures синтетические и допустимы. Не добавляй реальные клиентские данные; не читай .env и секреты.

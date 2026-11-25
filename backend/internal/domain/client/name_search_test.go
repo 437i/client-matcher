@@ -1,9 +1,33 @@
 package client
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestTokenizeSourceQueryKeepsTokenAlignment(t *testing.T) {
+	for _, input := range []string{"  Саша—СЕМЁНОВ,  ЁЛКИН 42 ", "ёлкин/пётр", "Семeнов Ёлкин", " — "} {
+		t.Run(input, func(t *testing.T) {
+			want := TokenizeSearchQuery(input)
+			words := nameWords(foldNameCase(input))
+			if len(want) != len(words) {
+				t.Fatalf("%d search tokens for %d source words", len(want), len(words))
+			}
+			for i, word := range words {
+				if want[i].Forms[0].Value != strings.ReplaceAll(word, "ё", "е") {
+					t.Fatalf("token %d does not align with source word %q", i, word)
+				}
+				if strings.ContainsRune(word, 'ё') {
+					want[i].Forms = append(want[i].Forms, SearchForm{Value: word, Kind: SearchFormPrimary})
+				}
+			}
+			if got := TokenizeSourceQuery(input); !reflect.DeepEqual(got, want) {
+				t.Fatalf("source tokens = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
 
 func tokenizedCandidate(value string) []SearchToken {
 	// В тестах кандидат представлен в формате CRM: фамилия, имя, отчество.
@@ -124,5 +148,36 @@ func TestKnownGivenNameAliases(t *testing.T) {
 				t.Fatalf("query %q should match given name %q", pair[0], pair[1])
 			}
 		})
+	}
+}
+
+func TestAuthoritativeCRMSearchTokens(t *testing.T) {
+	for _, tc := range []struct {
+		title, last, first, patronymic, query string
+		words                                 int
+		matched                               bool
+	}{
+		{"  Иванов Александр  ", "Петров", "Александр", "", "Саша Иванов", 2, true},
+		{"Иванов Александр", "Петров", "Александр", "", "Петров", 2, false},
+		{"Иванов", "", "Иван", "", "Ваня", 1, false},
+		{"Иванов Александр Александр", "", "Александр", "", "Саша Иванов", 3, false},
+		{"Иванов Александр", "Александр", "Александр", "", "Саша Иванов", 2, false},
+		{"Иванов Александр", "Иванов", "Саша", "", "Саша Иванов", 2, false},
+		{"Иванов Александр", "Иванов", "Алекснадр", "", "Саша Иванов", 2, false},
+		{"Иванов-Сидоров Александр", "Иванов Сидоров", "Александр", "", "Саша Сидоров Иванов", 3, true},
+		{"  ", "Иванов", "", "", "Иванов", 1, true},
+	} {
+		crm := CRMClient{SourceFullName: tc.title, LastName: tc.last, FirstName: tc.first, Patronymic: tc.patronymic}
+		wantName := tc.title
+		if strings.TrimSpace(wantName) == "" {
+			wantName = tc.last
+		}
+		if crm.FullName() != wantName {
+			t.Fatalf("display name %q: %q", tc.title, crm.FullName())
+		}
+		tokens := TokenizeCRMName(crm)
+		if len(tokens) != tc.words || (MatchNameTokens(TokenizeSearchQuery(tc.query), tokens) > 0) != tc.matched {
+			t.Fatalf("%q searched as %q: %+v", tc.title, tc.query, tokens)
+		}
 	}
 }

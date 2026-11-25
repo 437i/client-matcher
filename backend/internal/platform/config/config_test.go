@@ -3,9 +3,12 @@ package config
 import (
 	"strings"
 	"testing"
+
+	"github.com/bitrix24/b24gosdk/b24test"
 )
 
 func TestLoadSiteSource(t *testing.T) {
+	t.Setenv("CRM_SOURCE", "csv")
 	t.Setenv("DB_TRANSPORT", "")
 	for _, key := range []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "CRM_PATH", "SITE_PATH"} {
 		t.Setenv(key, "synthetic")
@@ -49,6 +52,7 @@ func TestLoadSiteSource(t *testing.T) {
 }
 
 func TestLoadSSH(t *testing.T) {
+	t.Setenv("CRM_SOURCE", "csv")
 	t.Setenv("DB_TRANSPORT", "ssh")
 	t.Setenv("SITE_SOURCE", "postgres")
 	for _, key := range []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "SITE_PATH"} {
@@ -83,5 +87,56 @@ func TestLoadSSH(t *testing.T) {
 				t.Fatalf("validation for %s: %v", tc.key, err)
 			}
 		})
+	}
+}
+
+func TestLoadCRMSource(t *testing.T) {
+	for _, key := range []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "CRM_PATH", "SITE_PATH"} {
+		t.Setenv(key, "synthetic")
+	}
+	t.Setenv("SITE_SOURCE", "csv")
+	t.Setenv("DB_TRANSPORT", "direct")
+	t.Setenv("BITRIX24_WEBHOOK_URL", "invalid")
+	for _, source := range []string{"", "csv"} {
+		t.Setenv("CRM_SOURCE", source)
+		cfg, err := Load()
+		if err != nil || cfg.CRMSource != CRMCSV || cfg.CSV.CRMPath != "synthetic" || cfg.Bitrix24WebhookURL != "" {
+			t.Fatalf("CSV selection: %v", err)
+		}
+	}
+	t.Setenv("CRM_PATH", "")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "CRM_PATH") {
+		t.Fatal("missing CRM_PATH accepted")
+	}
+	t.Setenv("CRM_SOURCE", "invalid")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "CRM_SOURCE") {
+		t.Fatal("invalid CRM_SOURCE accepted")
+	}
+	t.Setenv("CRM_SOURCE", "bitrix24")
+	t.Setenv("BITRIX24_WEBHOOK_URL", "")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "BITRIX24_WEBHOOK_URL") {
+		t.Fatal("missing webhook accepted")
+	}
+	t.Setenv("BITRIX24_WEBHOOK_URL", "https://example.invalid/rest/1/synthetic/")
+	cfg, err := Load()
+	if err != nil || cfg.CRMSource != CRMBitrix24 || cfg.CSV.CRMPath != "" || cfg.Bitrix24WebhookURL == "" {
+		t.Fatalf("Bitrix selection: %v", err)
+	}
+}
+
+func TestWebhookURLValidation(t *testing.T) {
+	portal := b24test.NewPortal(t)
+	for _, raw := range []string{
+		portal.URL(), "https:///rest/1/synthetic/", "https://synthetic@example.invalid/rest/1/synthetic/",
+		"https://example.invalid/rest/1/synthetic/?", "https://example.invalid/rest/1/synthetic/#",
+		"https://example.invalid/rest/api/synthetic/", "https://example.invalid/rest/0/synthetic/",
+		"https://example.invalid/rest/-1/synthetic/", "https://example.invalid/rest/1/%73ynthetic/",
+		"https://example.invalid/rest/1/synthetic", "https://example.invalid/rest/1//",
+		"https://example.invalid/rest/1/../", "https://example.invalid/rest/1/./",
+		"https://example.invalid/rest/1/synthetic/extra/", "https://example.invalid/rest/1/syn thetic/",
+	} {
+		if err := ValidateBitrix24WebhookURL(raw); err == nil || strings.Contains(err.Error(), raw) || strings.Contains(err.Error(), "synthetic") {
+			t.Fatal("expected safe validation error")
+		}
 	}
 }

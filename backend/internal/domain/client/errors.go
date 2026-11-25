@@ -7,6 +7,7 @@ import "errors"
 // от конкретного источника данных.
 var (
 	ErrInvalidSourceData = errors.New("invalid source client data")
+	ErrInvalidCRMID      = errors.New("invalid CRM ID")
 	ErrCRMNotFound       = errors.New("crm client not found")
 	ErrSiteNotFound      = errors.New("site client not found")
 )

@@ -65,6 +65,9 @@ func (s *ClientLinkService) Assess(ctx context.Context, crmID string, siteID int
 
 func (s *ClientLinkService) readCRM(ctx context.Context, id string) (client.CRMClient, error) {
 	record, err := s.crmRepo.GetByID(ctx, id)
+	if errors.Is(err, client.ErrInvalidCRMID) {
+		return record, ErrInvalidID
+	}
 	if err != nil {
 		return record, fmt.Errorf("read CRM record: %w", err)
 	}

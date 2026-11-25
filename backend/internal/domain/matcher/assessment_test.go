@@ -46,3 +46,51 @@ func TestConfirmationCodes(t *testing.T) {
 		t.Fatalf("audit codes: %v", got)
 	}
 }
+
+func TestAssessAuthoritativeTitle(t *testing.T) {
+	date, err := client.ParseDate("2006-04-16")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		title, last, first, patronymic, siteLast, siteFirst string
+		lastCode, firstCode                                 Code
+		status                                              Status
+		mismatch                                            bool
+	}{
+		{"Иванов Иван", "", "Пётр", "", "Иванов", "Иван", CodeExact, CodeExact, StatusReady, false},
+		{"Петров Иван", "Иванов", "", "", "Иванов", "Иван", CodeMissing, CodeExact, StatusRequiresConfirmation, false},
+		{"Иванов Иван Петрович", "", "", "", "Иванов", "Иван", CodeExact, CodeExact, StatusReady, false},
+		{"Иванов Иван Петрович", "", "", "Петрович", "Иванов", "Иван", CodeExact, CodeExact, StatusReady, false},
+		{"Иванов Иван Петрович", "", "", "Иванович", "Иванов", "Иван", CodeExact, CodeExact, StatusReady, false},
+		{"Иванов Иван Петров", "", "", "Иванович", "Иванов", "Иван", CodeExact, CodeExact, StatusRequiresConfirmation, true},
+		{"Иванов Иван", "", "", "Петрович", "Иванов", "Иван", CodeExact, CodeExact, StatusReady, false},
+		{"Иванов Иван", "Петров", "Пётр", "Иванович", "Иванов", "Иван", CodeExact, CodeExact, StatusReady, false},
+		{"  ", "Иванов", "", "", "Иванов", "Иван", CodeExact, CodeMissing, StatusRequiresConfirmation, false},
+		{"Иванов Александр Петрович", "", "", "", "Иванов", "Саша", CodeExact, CodeAliasMatch, StatusRequiresConfirmation, false},
+		{"Иванов Александр Петров", "", "Александр", "", "Иванов", "Саша", CodeExact, CodeAliasMatch, StatusRequiresConfirmation, true},
+		{"Сидоров Иван Петрович", "Сидоров", "", "Петрович", "Иванов", "Иван", CodeMismatch, CodeExact, StatusRequiresConfirmation, false},
+		{"Иванов Иван Петрович Лишнее", "", "", "", "Иванов", "Иван", CodeExact, CodeExact, StatusRequiresConfirmation, true},
+		{"Иванов Иван Ильич", "", "", "", "Иванов", "Иван", CodeExact, CodeExact, StatusRequiresConfirmation, true},
+		{"Иванов Иван Ильич", "", "", "ильич", "Иванов", "Иван", CodeExact, CodeExact, StatusReady, false},
+		{"Иванов Иван-Петрович", "", "", "", "Иванов", "Иван", CodeExact, CodeExact, StatusRequiresConfirmation, true},
+		{"Иванов Иван Иван", "", "", "", "Иванов", "Иван", CodeExact, CodeMissing, StatusRequiresConfirmation, false},
+		{"Иванов", "", "Иванов", "", "Иванов", "Иван", CodeExact, CodeMissing, StatusRequiresConfirmation, false},
+		{"Иванов", "", "", "", "Иванов", "Иванов", CodeMissing, CodeMissing, StatusRequiresConfirmation, false},
+		{"Иванов Иван", "", "", "", "", "", CodeMissing, CodeMissing, StatusRequiresConfirmation, false},
+		{"Петрович Иван Иванов-Сидоров", "", "", "", "Иванов Сидоров", "Иван", CodeNormalizedMatch, CodeExact, StatusReady, false},
+		{"Иванов Ивани", "", "Ивани", "", "Иванов", "Иваны", CodeExact, CodeProbableMatch, StatusRequiresConfirmation, false},
+	} {
+		t.Run(tc.title+"/"+tc.last+"/"+tc.first+"/"+tc.patronymic+"/"+tc.siteFirst, func(t *testing.T) {
+			crm := client.CRMClient{SourceFullName: tc.title, LastName: tc.last, FirstName: tc.first, Patronymic: tc.patronymic, Birthday: &date}
+			site := client.SiteClient{LastName: tc.siteLast, ShortName: tc.siteFirst, Birthday: &date}
+			if tc.siteFirst == "" {
+				site.UnstructuredName = "Иванов Иван"
+			}
+			got := Assess(crm, site)
+			if got.Status != tc.status || got.Checks[0].Code != tc.lastCode || got.Checks[1].Code != tc.firstCode || got.ConfirmationRequired != (tc.status == StatusRequiresConfirmation) || (got.FullNameMismatch != nil) != tc.mismatch {
+				t.Fatalf("assessment = %+v; want %s, %s, %s, full mismatch %v", got, tc.status, tc.lastCode, tc.firstCode, tc.mismatch)
+			}
+		})
+	}
+}

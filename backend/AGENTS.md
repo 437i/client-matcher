@@ -20,7 +20,7 @@
 - `internal/platform` — конфигурация и инфраструктурные подключения.
 - `migrations` — только схема собственной БД приложения.
 
-CRM читается из CSV, сайт — из CSV или отдельной PostgreSQL. Доступны direct + csv, direct + postgres и ssh + postgres. Настройки SSH приведены в [руководстве Stage 3](../docs/stage3-production.md).
+CRM читается из CSV локально или Bitrix24 в production. Оба outbound-адаптера работают через CRMReader и отделены от OD. Сайт читается из CSV или отдельной PostgreSQL. Доступны direct + csv, direct + postgres и ssh + postgres. [Адаптер Bitrix24](../docs/bitrix24-adapter.md) · [Руководство Stage 3](../docs/stage3-production.md)
 
 ## Фактические HTTP-маршруты на момент подготовки этих инструкций
 

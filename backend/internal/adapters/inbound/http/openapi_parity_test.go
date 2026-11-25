@@ -70,12 +70,14 @@ type stubLink struct {
 	crmBusy, siteBusy bool
 	createErr         error
 	listErr           error
+	decisions         []link.Decision
 }
 
-func (s *stubLink) Create(context.Context, link.Decision) (link.ClientLink, error) {
+func (s *stubLink) Create(_ context.Context, decision link.Decision) (link.ClientLink, error) {
 	if s.createErr != nil {
 		return link.ClientLink{}, s.createErr
 	}
+	s.decisions = append(s.decisions, decision)
 	return link.ClientLink{}, nil
 }
 
@@ -435,13 +437,13 @@ func documentedStatuses(t *testing.T) map[string]map[string]bool {
 	return out
 }
 
-func newParityServer(t *testing.T, crm *stubCRM, site *stubSite, links *stubLink, healthErr error) *gin.Engine {
+func newParityServer(t *testing.T, crm ports.CRMReader, site *stubSite, links *stubLink, healthErr error) *gin.Engine {
 	t.Helper()
 
 	return newParityServerWithClock(t, crm, site, links, healthErr, ports.SystemClock{})
 }
 
-func newParityServerWithClock(t *testing.T, crm *stubCRM, site *stubSite, links *stubLink, healthErr error, clock ports.Clock) *gin.Engine {
+func newParityServerWithClock(t *testing.T, crm ports.CRMReader, site *stubSite, links *stubLink, healthErr error, clock ports.Clock) *gin.Engine {
 	t.Helper()
 	svc := services.NewClientLinkService(crm, site, links, tokenOutbound.NewHMACToken([32]byte{1}, clock), clock)
 	srv, err := web.NewRouter(

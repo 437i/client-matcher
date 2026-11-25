@@ -18,6 +18,7 @@ import (
 	web "github.com/437i/client-matcher/backend/internal/adapters/inbound/http"
 	"github.com/437i/client-matcher/backend/internal/adapters/inbound/http/handlers"
 	tokenOutbound "github.com/437i/client-matcher/backend/internal/adapters/outbound"
+	"github.com/437i/client-matcher/backend/internal/adapters/outbound/crm/bitrix24"
 	crmCSV "github.com/437i/client-matcher/backend/internal/adapters/outbound/crm/csv"
 	linkPG "github.com/437i/client-matcher/backend/internal/adapters/outbound/link/postgres"
 	siteCSV "github.com/437i/client-matcher/backend/internal/adapters/outbound/site/csv"
@@ -52,7 +53,7 @@ func run() error {
 }
 
 func runConfigured(ctx context.Context, cfg config.Config) error {
-	crmRepo, err := crmCSV.NewCSVCRMRepo(cfg.CSV.CRMPath)
+	crmRepo, err := openCRM(cfg)
 	if err != nil {
 		return err
 	}
@@ -140,6 +141,17 @@ func runConfigured(ctx context.Context, cfg config.Config) error {
 		return errors.Join(fmt.Errorf("shutdown: %w", err), srv.Close())
 	}
 	return nil
+}
+
+func openCRM(cfg config.Config) (ports.CRMReader, error) {
+	switch cfg.CRMSource {
+	case "", config.CRMCSV:
+		return crmCSV.NewCSVCRMRepo(cfg.CSV.CRMPath)
+	case config.CRMBitrix24:
+		return bitrix24.New(cfg.Bitrix24WebhookURL)
+	default:
+		return nil, errors.New("invalid CRM source")
+	}
 }
 
 func openSite(ctx context.Context, cfg config.Config) (ports.SiteReader, *pgxpool.Pool, error) {

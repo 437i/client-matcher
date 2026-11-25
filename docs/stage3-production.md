@@ -1,6 +1,6 @@
 # Запуск Client Matcher через SSH
 
-Production использует отдельные SSH-сессии и PostgreSQL-пулы для SITE и OD. SITE — PostgreSQL **10.23**, OD — PostgreSQL **16.15**. CRM до Stage 6 читает CSV через CRM_PATH.
+Production использует отдельные SSH-сессии и PostgreSQL-пулы для SITE и OD. SITE — PostgreSQL **10.23**, OD — PostgreSQL **16.15**. Stage 4 добавляет CRM-источник Bitrix24. Для будущей проверки на портале потребуется отдельная чистая OD со штатными миграциями. [Адаптер и чеклист](bitrix24-adapter.md)
 
 ## Переменные и файлы
 
@@ -17,10 +17,10 @@ Production использует отдельные SSH-сессии и PostgreSQ
 | SITE_PASSWORD, OD_PASSWORD | Пароли PostgreSQL. |
 | OD_SSH_KEY | Абсолютный путь на хосте к незашифрованному OD SSH-ключу. В контейнере /run/client-matcher/od-key. |
 | SSH_KNOWN_HOSTS_PATH | Абсолютный путь к доверенному known_hosts на хосте. В контейнере /run/client-matcher/known_hosts. |
-| CRM_PATH | Абсолютный путь к CSV CRM на хосте. В контейнере /run/client-matcher/crm.csv. |
+| BITRIX24_WEBHOOK_URL | Полный HTTPS URL классического webhook. Передаётся только backend как секрет из окружения или внешнего файла. |
 | FRONTEND_PORT | Порт frontend на 127.0.0.1, по умолчанию 3000. |
 
-Compose передаёт backend режимы DB_TRANSPORT=ssh и SITE_SOURCE=postgres. Все три файла монтируются только для чтения. Права на хосте должны позволять пользователю app в контейнере читать эти файлы (проверьте UID и GID командой id в контейнере).
+Compose передаёт backend режимы DB_TRANSPORT=ssh, SITE_SOURCE=postgres и CRM_SOURCE=bitrix24. Файлы OD-ключа и known_hosts монтируются только для чтения. Права на хосте должны позволять пользователю app в контейнере читать эти файлы (проверьте UID и GID командой id в контейнере). Для диагностики используйте приведённые ниже команды. Полный вывод интерполированного Compose и окружения контейнера раскрывает секреты.
 
 Пример формата known_hosts с фиктивными ключами. Используйте соответствующие проверенные ключи команды деплоя.
 

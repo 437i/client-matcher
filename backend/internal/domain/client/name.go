@@ -15,11 +15,15 @@ var nameCaseFolder = cases.Fold()
 // Unicode NFC, регистронезависимое сравнение, ё = е и нормализованные пробелы.
 // Исходное имя при этом не изменяется.
 func NormalizeName(s string) string {
-	s = norm.NFC.String(s)
-	s = nameCaseFolder.String(s)
-	s = norm.NFC.String(s)
+	s = foldNameCase(s)
 	s = strings.ReplaceAll(s, "ё", "е")
 	return strings.Join(strings.Fields(s), " ")
+}
+
+func foldNameCase(s string) string {
+	s = norm.NFC.String(s)
+	s = nameCaseFolder.String(s)
+	return norm.NFC.String(s)
 }
 
 func GivenNameAliases(a, b string) bool {

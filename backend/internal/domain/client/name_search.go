@@ -81,10 +81,36 @@ func TokenizeSearchQuery(value string) []SearchToken {
 	return tokenizeName(value, true, false)
 }
 
+// TokenizeSourceQuery adds the input spellings with ё for server-side selection.
+func TokenizeSourceQuery(value string) []SearchToken {
+	tokens := TokenizeSearchQuery(value)
+	words := nameWords(foldNameCase(value))
+	if len(tokens) != len(words) {
+		return nil
+	}
+	for i, word := range words {
+		if strings.ContainsRune(word, 'ё') {
+			tokens[i].Forms = append(tokens[i].Forms, SearchForm{Value: word, Kind: SearchFormPrimary})
+		}
+	}
+	return tokens
+}
+
 // TokenizeCRMName строит поисковое представление структурированного ФИО.
 // Словарь кратких имён применяется только к FirstName, но не к фамилии или
 // отчеству. Исходные поля CRM при этом не изменяются.
 func TokenizeCRMName(value CRMClient) []SearchToken {
+	if strings.TrimSpace(value.SourceFullName) != "" {
+		tokens := TokenizeName(value.SourceFullName)
+		_, first, _ := ConfirmedTitleRoles(TitleWords(value.SourceFullName), value)
+		for i := first.Start; i < min(first.End, len(tokens)); i++ {
+			tokens[i].IsGivenName = true
+			for _, alias := range nameAliases[tokens[i].Forms[0].Value] {
+				tokens[i].Forms = append(tokens[i].Forms, SearchForm{Value: alias, Kind: SearchFormAlias})
+			}
+		}
+		return tokens
+	}
 	if value.UnstructuredName != "" {
 		return TokenizeName(value.UnstructuredName)
 	}
@@ -96,7 +122,24 @@ func TokenizeCRMName(value CRMClient) []SearchToken {
 }
 
 func tokenizeName(value string, addAliases, isGivenName bool) []SearchToken {
-	normalized := NormalizeName(value)
+	words := nameWords(NormalizeName(value))
+	tokens := make([]SearchToken, 0, len(words))
+	for _, word := range words {
+		forms := []SearchForm{{Value: word, Kind: SearchFormPrimary}}
+		if folded, ok := foldMixedCyrillicLatin(word); ok && folded != word {
+			forms = append(forms, SearchForm{Value: folded, Kind: SearchFormHomoglyph})
+		}
+		if addAliases {
+			for _, alias := range nameAliases[word] {
+				forms = append(forms, SearchForm{Value: alias, Kind: SearchFormAlias})
+			}
+		}
+		tokens = append(tokens, SearchToken{Forms: forms, IsGivenName: isGivenName})
+	}
+	return tokens
+}
+
+func nameWords(normalized string) []string {
 	words := make([]string, 0, 4)
 	var current strings.Builder
 
@@ -117,24 +160,7 @@ func tokenizeName(value string, addAliases, isGivenName bool) []SearchToken {
 	}
 	flush()
 
-	tokens := make([]SearchToken, 0, len(words))
-	for _, word := range words {
-		forms := []SearchForm{{Value: word, Kind: SearchFormPrimary}}
-
-		if folded, ok := foldMixedCyrillicLatin(word); ok && folded != word {
-			forms = append(forms, SearchForm{Value: folded, Kind: SearchFormHomoglyph})
-		}
-
-		if addAliases {
-			for _, alias := range nameAliases[word] {
-				forms = append(forms, SearchForm{Value: alias, Kind: SearchFormAlias})
-			}
-		}
-
-		tokens = append(tokens, SearchToken{Forms: forms, IsGivenName: isGivenName})
-	}
-
-	return tokens
+	return words
 }
 
 // MatchNameTokens возвращает оценку совпадения или 0, если запрос не подходит.

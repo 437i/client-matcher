@@ -3,13 +3,17 @@ package outbound
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	crmcsv "github.com/437i/client-matcher/backend/internal/adapters/outbound/crm/csv"
 	"github.com/437i/client-matcher/backend/internal/application/ports"
+	"github.com/437i/client-matcher/backend/internal/application/services"
 	"github.com/437i/client-matcher/backend/internal/domain/client"
+	"github.com/437i/client-matcher/backend/internal/domain/link"
 )
 
 type testClock struct{ now time.Time }
@@ -95,3 +99,79 @@ func TestAssessmentToken(t *testing.T) {
 		t.Fatalf("expiry: %v", err)
 	}
 }
+
+func TestPreviousCSVSnapshotTokenIsStale(t *testing.T) {
+	clock := &testClock{time.Unix(1000, 0).UTC()}
+	codec := NewHMACToken([32]byte{1}, clock)
+	crm, err := crmcsv.NewCSVCRMRepo("crm/csv/testdata/stage0/crm.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidates, err := crm.Search(t.Context(), "Иван", 1)
+	if err != nil || len(candidates) != 1 {
+		t.Fatalf("CSV candidate: %v", err)
+	}
+	record, err := crm.GetByID(t.Context(), candidates[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site := client.SiteClient{ID: 1, ShortName: record.FirstName, LastName: record.LastName, Birthday: record.Birthday}
+	links := &snapshotLinks{}
+	svc := services.NewClientLinkService(crm, snapshotSite{site}, links, codec, clock)
+	newSnapshot := sourceBytes(record, site)
+	var emptyTitle []byte
+	emptyTitle = binary.BigEndian.AppendUint64(emptyTitle, uint64(len("crm.source_full_name")))
+	emptyTitle = append(emptyTitle, "crm.source_full_name"...)
+	emptyTitle = append(emptyTitle, 1)
+	emptyTitle = binary.BigEndian.AppendUint64(emptyTitle, 0)
+	if bytes.Count(newSnapshot, emptyTitle) != 1 {
+		t.Fatal("missing length-prefixed empty title")
+	}
+	previous := bytes.Replace(newSnapshot, emptyTitle, nil, 1)
+	oldFingerprint := digest(codec.fingerprintKey, previous)
+	if oldFingerprint == codec.Fingerprint(record, site) {
+		t.Fatal("CSV snapshots must change")
+	}
+	old, err := codec.Issue(t.Context(), ports.TokenClaims{CRMID: record.ID, SiteID: 1, Fingerprint: oldFingerprint, IssuedAt: clock.now, ExpiresAt: clock.now.Add(ports.TokenTTL), TokenVersion: ports.TokenVersion, RuleVersion: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.CreateLink(t.Context(), record.ID, 1, &old, false, ""); !errors.Is(err, services.ErrAssessmentStale) || links.created != 0 {
+		t.Fatalf("old token: %v, writes %d", err, links.created)
+	}
+	fresh, err := svc.Assess(t.Context(), record.ID, 1)
+	if err != nil || fresh.Token == nil {
+		t.Fatalf("fresh assessment: %v", err)
+	}
+	reason := ""
+	if fresh.ConfirmationRequired {
+		reason = "Проверено"
+	}
+	if _, err := svc.CreateLink(t.Context(), record.ID, 1, fresh.Token, fresh.ConfirmationRequired, reason); err != nil || links.created != 1 {
+		t.Fatalf("fresh token: %v, writes %d", err, links.created)
+	}
+	changed := record
+	changed.SourceFullName = " Иван Иванов "
+	changedFormatting := changed
+	changedFormatting.SourceFullName = "Иван Иванов"
+	if codec.Fingerprint(changed, site) == codec.Fingerprint(changedFormatting, site) {
+		t.Fatal("raw title formatting must affect the fingerprint")
+	}
+}
+
+type snapshotSite struct{ record client.SiteClient }
+
+func (s snapshotSite) GetByID(context.Context, int64) (client.SiteClient, error) {
+	return s.record, nil
+}
+
+type snapshotLinks struct{ created int }
+
+func (*snapshotLinks) LookupBySourceIDs(context.Context, string, int64) (bool, bool, error) {
+	return false, false, nil
+}
+func (s *snapshotLinks) Create(context.Context, link.Decision) (link.ClientLink, error) {
+	s.created++
+	return link.ClientLink{}, nil
+}
+func (*snapshotLinks) List(context.Context) ([]link.ClientLink, error) { return nil, nil }

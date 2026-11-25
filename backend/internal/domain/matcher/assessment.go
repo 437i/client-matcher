@@ -1,11 +1,13 @@
 package matcher
 
 import (
-	"github.com/437i/client-matcher/backend/internal/domain/client"
 	"slices"
+	"strings"
+
+	"github.com/437i/client-matcher/backend/internal/domain/client"
 )
 
-const RuleVersion = 1
+const RuleVersion = 2
 
 type Status string
 
@@ -43,6 +45,11 @@ type Assessment struct {
 	Status               Status
 	Checks               []FieldCheck
 	ConfirmationRequired bool
+	FullNameMismatch     *FullNameMismatch
+}
+
+type FullNameMismatch struct {
+	CRMValue, SiteValue string
 }
 
 func Assess(crm client.CRMClient, site client.SiteClient) Assessment {
@@ -57,14 +64,21 @@ func Assess(crm client.CRMClient, site client.SiteClient) Assessment {
 		{FieldFirstName, compareName(crm.FirstName, site.ShortName, true), value(crm.FirstName), value(site.ShortName)},
 		{FieldBirthday, compareBirthday(crm.Birthday, site.Birthday), dateValue(crm.Birthday), dateValue(site.Birthday)},
 	}
+	var fullNameMismatch *FullNameMismatch
+	if strings.TrimSpace(crm.SourceFullName) != "" {
+		checks[0], checks[1], fullNameMismatch = assessTitle(crm, site)
+	}
 	status := StatusReady
+	if fullNameMismatch != nil {
+		status = StatusRequiresConfirmation
+	}
 	for _, check := range checks {
 		if check.Code != CodeExact && check.Code != CodeNormalizedMatch {
 			status = StatusRequiresConfirmation
 			break
 		}
 	}
-	return Assessment{Status: status, Checks: checks, ConfirmationRequired: status == StatusRequiresConfirmation}
+	return Assessment{Status: status, Checks: checks, ConfirmationRequired: status == StatusRequiresConfirmation, FullNameMismatch: fullNameMismatch}
 }
 
 func compareName(a, b string, given bool) Code {
@@ -116,6 +130,9 @@ func compareBirthday(a, b *client.Date) Code {
 
 func (a Assessment) ConfirmationCodes() []string {
 	codes := []string{}
+	if a.FullNameMismatch != nil {
+		codes = append(codes, "name:mismatch")
+	}
 	for _, check := range a.Checks {
 		if check.Code == CodeExact || check.Code == CodeNormalizedMatch {
 			continue

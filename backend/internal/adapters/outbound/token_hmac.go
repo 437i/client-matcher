@@ -57,6 +57,7 @@ func sourceBytes(crm client.CRMClient, site client.SiteClient) []byte {
 	field("crm.first_name", crm.FirstName)
 	field("crm.patronymic", crm.Patronymic)
 	field("crm.unstructured_name", crm.UnstructuredName)
+	field("crm.source_full_name", crm.SourceFullName)
 	date("crm.birthday", crm.Birthday)
 	field("site.id", strconv.FormatInt(site.ID, 10))
 	field("site.last_name", site.LastName)

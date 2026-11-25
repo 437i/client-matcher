@@ -42,6 +42,7 @@ services:
       DB_NAME: ${DB_NAME:-client_matcher}
       DB_SSLMODE: disable
       PORT: "8080"
+      CRM_SOURCE: csv
       CRM_PATH: /data/crm.csv
       SITE_PATH: /data/site.csv
       GIN_MODE: release
