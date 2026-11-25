@@ -85,6 +85,9 @@ func TokenizeSearchQuery(value string) []SearchToken {
 func TokenizeSourceQuery(value string) []SearchToken {
 	tokens := TokenizeSearchQuery(value)
 	words := nameWords(foldNameCase(value))
+	// Оба прохода используют nameWords: нормализация меняет написание,
+	// сохраняя границы слов. Для серверного фильтра токены должны
+	// соответствовать исходным словам по индексам.
 	if len(tokens) != len(words) {
 		return nil
 	}

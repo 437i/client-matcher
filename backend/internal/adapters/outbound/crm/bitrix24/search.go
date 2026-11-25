@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	errConditions = errors.New("bitrix24 search condition budget exceeded")
-	errPages      = errors.New("bitrix24 search page budget exceeded")
-	errCursor     = errors.New("bitrix24 search cursor did not advance")
-	errRows       = errors.New("bitrix24 search returned invalid records")
+	errConditions     = errors.New("bitrix24 search condition budget exceeded")
+	errPages          = errors.New("bitrix24 search page budget exceeded")
+	errCursor         = errors.New("bitrix24 search cursor did not advance")
+	errRows           = errors.New("bitrix24 search returned invalid records")
+	errTokenAlignment = errors.New("bitrix24 search token alignment invariant violated")
 )
 
 var nameFields = [...]string{titleField, lastField, firstField, patronymicField}
@@ -54,7 +55,7 @@ func (r *Repo) Search(ctx context.Context, query string, limit int) ([]client.CR
 	}
 	sourceTokens := client.TokenizeSourceQuery(query)
 	if len(sourceTokens) == 0 {
-		return []client.CRMClient{}, nil
+		return nil, errTokenAlignment
 	}
 	records := make(map[string]client.CRMClient)
 	remaining := r.policy.maxPages
